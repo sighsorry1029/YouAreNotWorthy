@@ -1,0 +1,236 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')"/>
+    <Import Project="environment.props"/>
+    <PropertyGroup>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+        <ProjectGuid>{4358610B-F3F4-4843-B7AF-98B7BC60DCDE}</ProjectGuid>
+        <OutputType>Library</OutputType>
+        <AppDesignerFolder>Properties</AppDesignerFolder>
+        <RootNamespace>YouAreNotWorthy</RootNamespace>
+        <AssemblyName>YouAreNotWorthy</AssemblyName>
+        <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+        <FileAlignment>512</FileAlignment>
+        <LangVersion>10.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <YamlDotNetVersion>16.3.0</YamlDotNetVersion>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <DebugSymbols>true</DebugSymbols>
+        <DebugType>full</DebugType>
+        <Optimize>false</Optimize>
+        <OutputPath>bin\Debug\</OutputPath>
+        <DefineConstants>DEBUG;TRACE</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <DebugType>pdbonly</DebugType>
+        <Optimize>true</Optimize>
+        <OutputPath>bin\Release\</OutputPath>
+        <DefineConstants>TRACE</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+    </PropertyGroup>
+    <Choose>
+        <When Condition="($(OS) == 'Unix' OR $(OS) == 'OSX') AND $(GamePath) == ''">
+            <PropertyGroup>
+                <GamePath Condition="!Exists('$(GamePath)')">$(HOME)/.steam/steam/steamapps/common/Valheim</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)')">$(HOME)/Library/Application Support/Steam/steamapps/common/Valheim/Contents/MacOS</GamePath>
+                <CorlibPath Condition="!Exists('$(CorlibPath)') AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed</CorlibPath>
+                <CorlibPath Condition="!Exists('$(CorlibPath)')">$(GamePath)/unstripped_corelib</CorlibPath>
+            </PropertyGroup>
+        </When>
+        <When Condition="($(OS) == 'Windows_NT') AND $(GamePath) == ''">
+            <PropertyGroup>
+                <GamePath Condition="!Exists('$(GamePath)')">$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 892970', 'InstallLocation', null, RegistryView.Registry64, RegistryView.Registry32))</GamePath>
+                <_SteamLibraryPath>$([MSBuild]::GetRegistryValueFromView('HKEY_CURRENT_USER\SOFTWARE\Valve\Steam', 'SteamPath', null, RegistryView.Registry32))</_SteamLibraryPath>
+                <GamePath Condition="!Exists('$(GamePath)') AND '$(_SteamLibraryPath)' != ''">$(_SteamLibraryPath)\steamapps\common\Valheim</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)') AND Exists('$(ValheimGamePath)')">$(ValheimGamePath)</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)')">C:\Program Files\Steam\steamapps\common\Valheim</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)')">C:\Program Files (x86)\Steam\steamapps\common\Valheim</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)')">D:\SteamLibrary\steamapps\common\Valheim</GamePath>
+                <BepInExPath Condition="!Exists('$(BepInExPath)')AND Exists('$(GamePath)')">$(GamePath)\BepInEx</BepInExPath>
+                <CorlibPath Condition="!Exists('$(CorlibPath)') AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed</CorlibPath>
+                <CorlibPath Condition="!Exists('$(CorlibPath)') AND Exists('$(GamePath)')">$(GamePath)\unstripped_corlib</CorlibPath>
+                <PublicizedAssembliesPath Condition="!Exists('$(PublicizedAssembliesPath)') AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed\publicized_assemblies</PublicizedAssembliesPath>
+            </PropertyGroup>
+        </When>
+    </Choose>
+    <ItemGroup>
+        <Reference Include="0Harmony">
+            <HintPath>$(BepInExPath)\core\0Harmony.dll</HintPath>
+        </Reference>
+        <Reference Include="assembly_guiutils">
+            <HintPath>$(PublicizedAssembliesPath)\assembly_guiutils_publicized.dll</HintPath>
+        </Reference>
+        <Reference Include="assembly_utils">
+            <HintPath>$(PublicizedAssembliesPath)\assembly_utils_publicized.dll</HintPath>
+        </Reference>
+        <Reference Include="assembly_valheim">
+            <HintPath>$(PublicizedAssembliesPath)\assembly_valheim_publicized.dll</HintPath>
+        </Reference>
+        <Reference Include="BepInEx">
+            <HintPath>$(BepInExPath)\core\BepInEx.dll</HintPath>
+        </Reference>
+        <Reference Include="com.rlabrecque.steamworks.net">
+            <HintPath>$(CorlibPath)\com.rlabrecque.steamworks.net.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="ServerSync">
+            <HintPath>Libs\ServerSync.dll</HintPath>
+            <Private>True</Private>
+        </Reference>
+        <Reference Include="System"/>
+        <Reference Include="System.Core"/>
+        <Reference Include="UnityEngine">
+            <HintPath>$(CorlibPath)\UnityEngine.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AssetBundleModule">
+            <HintPath>$(CorlibPath)\UnityEngine.AssetBundleModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(CorlibPath)\UnityEngine.CoreModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.IMGUIModule">
+            <HintPath>$(CorlibPath)\UnityEngine.IMGUIModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.InputLegacyModule">
+            <HintPath>$(CorlibPath)\UnityEngine.InputLegacyModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.UI">
+            <HintPath>$(CorlibPath)\UnityEngine.UI.dll</HintPath>
+        </Reference>
+        <Reference Include="Unity.TextMeshPro">
+            <HintPath>$(GamePath)\valheim_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+        </Reference>
+        <!-- Legacy non-SDK dotnet builds do not resolve PackageReference compile assets; keep this bridge versioned by YamlDotNetVersion. -->
+        <Reference Include="YamlDotNet">
+            <HintPath>$(NuGetPackageRoot)yamldotnet\$(YamlDotNetVersion)\lib\net47\YamlDotNet.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+    <ItemGroup>
+        <Compile Include="API\YouAreNotWorthyApi.cs"/>
+        <Compile Include="Config\ProgressionConfig.cs"/>
+        <Compile Include="Config\ProgressionConfigLoader.cs"/>
+        <Compile Include="Core\ItemReferenceWriter.cs"/>
+        <Compile Include="Core\ItemReferenceCommands.cs"/>
+        <Compile Include="Core\KeyReferenceWriter.cs"/>
+        <Compile Include="Core\PersonalKeySnapshot.cs"/>
+        <Compile Include="Core\PlayerKeyCommands.cs"/>
+        <Compile Include="Core\PlayerKeys.cs"/>
+        <Compile Include="Core\PrefabOwnerResolver.cs"/>
+        <Compile Include="Core\ProgressionIndex.cs"/>
+        <Compile Include="Core\RequirementTranslations.cs"/>
+        <Compile Include="Core\RequirementTextResolver.cs"/>
+        <Compile Include="Core\RestrictionEvaluator.cs"/>
+        <Compile Include="Core\ValheimNameUtils.cs"/>
+        <Compile Include="Patches\CreatureSpawnerPatches.cs"/>
+        <Compile Include="Patches\GlobalKeyPatches.cs"/>
+        <Compile Include="Patches\DefeatKeyPatches.cs"/>
+        <Compile Include="Patches\PlayerLifecyclePatches.cs"/>
+        <Compile Include="Patches\RaidPatches.cs"/>
+        <Compile Include="Patches\RestrictionPatches.cs"/>
+        <Compile Include="Patches\SpawnSystemPatches.cs"/>
+        <Compile Include="Plugin.cs"/>
+        <Compile Include="Properties\AssemblyInfo.cs"/>
+    </ItemGroup>
+    <ItemGroup>
+        <Content Include=".gitignore"/>
+        <Content Include="environment.props"/>
+        <Content Include="ILRepack.targets"/>
+        <Content Include="Docs\ProgressionSchema.md"/>
+        <Content Include="Docs\VanillaGlobalAndPlayerRaidKeys.md"/>
+        <Content Include="LICENSE.txt"/>
+        <Content Include="README.md"/>
+        <Content Include="Thunderstore\CHANGELOG.md"/>
+        <Content Include="Thunderstore\icon.png"/>
+        <Content Include="Thunderstore\manifest.json"/>
+        <EmbeddedResource Include="Config\progression.default.yml"/>
+        <Content Include="translations\English.yml"/>
+        <EmbeddedResource Include="translations\Korean.yml">
+            <LogicalName>YouAreNotWorthy.translations.Korean.yml</LogicalName>
+        </EmbeddedResource>
+        <Content Include="UpdateManifest.ps1"/>
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="App.config"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.44.1">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="YamlDotNet" Version="$(YamlDotNetVersion)" />
+    </ItemGroup>
+    <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
+
+    <Target Name="GetAssemblyVersion">
+        <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">
+            <Output TaskParameter="Assemblies" ItemName="Targets"/>
+        </GetAssemblyIdentity>
+        <ItemGroup>
+            <AssemblyVersions Include="@(Targets->'%(Version)')"/>
+        </ItemGroup>
+        <Error Text="Failed to get Assembly Version." Condition="'%(AssemblyVersions.Identity)' == ''"/>
+        <PropertyGroup>
+            <AssemblyVersion>%(AssemblyVersions.Identity)</AssemblyVersion>
+            <Major>$(AssemblyVersion.Split('.')[0])</Major>
+            <Minor>$(AssemblyVersion.Split('.')[1])</Minor>
+            <Patch>$(AssemblyVersion.Split('.')[2])</Patch>
+            <PackageName>$(AssemblyName)_v$(Major).$(Minor).$(Patch)</PackageName>
+            <PackageVersion>$(Major).$(Minor).$(Patch)</PackageVersion>
+            <PackageDir>$(ProjectDir)$(IntermediateOutputPath)package\$(PackageName)</PackageDir>
+            <PackageFile>$(ProjectDir)Thunderstore\$(PackageName).zip</PackageFile>
+        </PropertyGroup>
+    </Target>
+
+    <Target Name="Deploy" DependsOnTargets="Build">
+        <PropertyGroup>
+            <DeployPath Condition="'$(DeployPath)' == ''">$(BepInExPath)\plugins</DeployPath>
+        </PropertyGroup>
+        <Error Text="DLL not found in target directory." Condition="!Exists('$(TargetPath)')"/>
+        <Error Text="DeployPath was not provided and the default BepInEx plugins directory was not found." Condition="'$(DeployPath)' == '' Or !Exists('$(DeployPath)')"/>
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployPath)" OverwriteReadOnlyFiles="true"/>
+        <Message Text="Deployed $(TargetFileName) to $(DeployPath)" Importance="high"/>
+    </Target>
+
+    <Target Name="Package" DependsOnTargets="Build">
+        <Error Text="The Package target requires Configuration=Release." Condition="'$(Configuration)' != 'Release'"/>
+    </Target>
+
+    <Target Name="CreateReleasePackage"
+            AfterTargets="ILRepacker"
+            DependsOnTargets="GetAssemblyVersion"
+            Condition="'$(Configuration)' == 'Release'">
+        <Error Text="DLL not found in target directory." Condition="!Exists('$(TargetPath)')"/>
+        <Error Text="README.md not found in project directory." Condition="!Exists('$(ProjectDir)README.md')"/>
+        <Error Text="CHANGELOG.md not found in Thunderstore directory." Condition="!Exists('$(ProjectDir)Thunderstore\CHANGELOG.md')"/>
+        <Error Text="manifest.json not found in Thunderstore directory." Condition="!Exists('$(ProjectDir)Thunderstore\manifest.json')"/>
+        <Error Text="icon.png not found in Thunderstore directory." Condition="!Exists('$(ProjectDir)Thunderstore\icon.png')"/>
+        <Error Text="English.yml not found in translations directory." Condition="!Exists('$(ProjectDir)translations\English.yml')"/>
+        <PropertyGroup>
+            <PowerShellExecutable Condition="'$(OS)' == 'Windows_NT'">powershell.exe</PowerShellExecutable>
+            <PowerShellExecutable Condition="'$(OS)' != 'Windows_NT'">pwsh</PowerShellExecutable>
+        </PropertyGroup>
+        <Exec Command="&quot;$(PowerShellExecutable)&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)UpdateManifest.ps1&quot; -manifestFile &quot;$(ProjectDir)Thunderstore\manifest.json&quot; -versionString &quot;$(PackageVersion)&quot;"/>
+        <ItemGroup>
+            <PackageRootFiles Include="$(TargetPath)"/>
+            <PackageRootFiles Include="$(ProjectDir)README.md"/>
+            <PackageRootFiles Include="$(ProjectDir)Thunderstore\CHANGELOG.md"/>
+            <PackageRootFiles Include="$(ProjectDir)Thunderstore\manifest.json"/>
+            <PackageRootFiles Include="$(ProjectDir)Thunderstore\icon.png"/>
+        </ItemGroup>
+        <RemoveDir Directories="$(PackageDir)" Condition="Exists('$(PackageDir)')"/>
+        <MakeDir Directories="$(PackageDir)"/>
+        <Copy SourceFiles="@(PackageRootFiles)" DestinationFolder="$(PackageDir)"/>
+        <Copy SourceFiles="$(ProjectDir)translations\English.yml" DestinationFiles="$(PackageDir)\$(AssemblyName).English.yml"/>
+        <ZipDirectory SourceDirectory="$(PackageDir)" DestinationFile="$(PackageFile)" Overwrite="true"/>
+        <RemoveDir Directories="$(PackageDir)"/>
+        <Message Text="Created package $(PackageFile)" Importance="high"/>
+    </Target>
+
+</Project>

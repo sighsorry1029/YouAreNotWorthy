@@ -1,0 +1,14 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea/
+.vs/
+*.sln.DotSettings.user
+Thunderstore/*.zip
+/Maps/
+Libs/decompiled/
+Libs/BiomeLock.dll
+Libs/VentureValheim.Progression.dll
+Libs/ReferenceMods.Analysis.md
