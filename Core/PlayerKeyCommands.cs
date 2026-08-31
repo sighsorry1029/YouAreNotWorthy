@@ -245,12 +245,6 @@ internal static class PlayerKeyCommands
             return;
         }
 
-        if (!ZNet.instance.IsServer() && !YouAreNotWorthyPlugin.IsLocalAdmin)
-        {
-            args.Context?.AddString("You are not an admin on this server.");
-            return;
-        }
-
         if (!TryParseCommand(args, out AdminOperation operation, out string steamId, out string key))
         {
             PrintUsage(args.Context);
@@ -792,9 +786,9 @@ internal static class PlayerKeyCommands
         foreach (ZNetPeer peer in net.GetConnectedPeers())
         {
             if (!peer.IsReady()
+                || !peer.m_rpc.IsConnected()
                 || peer.m_characterID.IsNone()
-                || !TryNormalizeConnectedSteamId(peer.m_socket.GetHostName(), out string steamId)
-                || (Object?)PlayerKeys.FindPlayerByOwner(peer.m_uid) == null)
+                || !TryNormalizeConnectedSteamId(peer.m_socket.GetHostName(), out string steamId))
             {
                 continue;
             }
@@ -895,13 +889,14 @@ internal static class PlayerKeyCommands
         try
         {
             ZNet? net = ZNet.instance;
-            ZNetPeer? peer = net?.GetPeer(requester);
+            ZNetPeer? peer = net?.GetConnectedPeers().Find(
+                candidate => ReferenceEquals(candidate.m_rpc, requester));
             return (Object?)net != null
                    && net.IsServer()
                    && peer != null
                    && peer.IsReady()
                    && ReferenceEquals(peer.m_rpc, requester)
-                   && net.IsAdmin(requester.GetSocket().GetHostName());
+                   && net.IsAdmin(peer.m_socket.GetHostName());
         }
         catch (Exception)
         {

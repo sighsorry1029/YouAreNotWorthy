@@ -246,7 +246,7 @@ public static class YouAreNotWorthyApi
             || !peer.m_rpc.IsConnected()
             || peer.m_characterID.IsNone()
             || peer.m_characterID.UserID != peer.m_uid
-            || !ReferenceEquals(znet.GetPeer(peer.m_rpc), peer))
+            || !ReferenceEquals(znet.GetPeer(peer.m_uid), peer))
         {
             return false;
         }

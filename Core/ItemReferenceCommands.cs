@@ -133,12 +133,6 @@ internal static class ItemReferenceCommands
             return;
         }
 
-        if (!YouAreNotWorthyPlugin.IsLocalAdmin)
-        {
-            args.Context?.AddString("You are not an admin on this server.");
-            return;
-        }
-
         ZNetPeer? serverPeer = net.GetServerPeer();
         if (serverPeer == null || !serverPeer.m_rpc.IsConnected())
         {
@@ -245,13 +239,14 @@ internal static class ItemReferenceCommands
         try
         {
             ZNet? net = ZNet.instance;
-            ZNetPeer? peer = net?.GetPeer(requester);
+            ZNetPeer? peer = net?.GetConnectedPeers().Find(
+                candidate => ReferenceEquals(candidate.m_rpc, requester));
             return (Object?)net != null
                    && net.IsServer()
                    && peer != null
                    && peer.IsReady()
                    && ReferenceEquals(peer.m_rpc, requester)
-                   && net.IsAdmin(requester.GetSocket().GetHostName());
+                   && net.IsAdmin(peer.m_socket.GetHostName());
         }
         catch (Exception)
         {
