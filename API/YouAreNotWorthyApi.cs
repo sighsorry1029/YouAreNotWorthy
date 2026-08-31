@@ -132,7 +132,7 @@ public static class YouAreNotWorthyApi
                 return failure;
             }
 
-            if (!TryGetAuthenticatedPeerCharacter(peer, out ZDO character))
+            if (!PlayerKeys.TryGetAuthenticatedPeerCharacter(peer, out ZDO character))
             {
                 return KeyQueryResult.Unavailable;
             }
@@ -230,68 +230,4 @@ public static class YouAreNotWorthyApi
             : KeyQueryResult.PersonalMissing;
     }
 
-    private static bool TryGetAuthenticatedPeerCharacter(
-        ZNetPeer? peer,
-        out ZDO character)
-    {
-        character = null!;
-        ZNet? znet = ZNet.instance;
-        ZDOMan? zdoMan = ZDOMan.instance;
-        if (peer == null
-            || (Object?)znet == null
-            || !znet.IsServer()
-            || zdoMan == null
-            || !peer.IsReady()
-            || peer.m_rpc == null
-            || !peer.m_rpc.IsConnected()
-            || peer.m_characterID.IsNone()
-            || peer.m_characterID.UserID != peer.m_uid
-            || !ReferenceEquals(znet.GetPeer(peer.m_uid), peer))
-        {
-            return false;
-        }
-
-        ZDO? candidate = zdoMan.GetZDO(peer.m_characterID);
-        if (candidate == null
-            || !candidate.IsValid()
-            || candidate.GetOwner() != peer.m_uid)
-        {
-            return false;
-        }
-
-        Player? livePlayer = null;
-        foreach (Player player in Player.GetAllPlayers())
-        {
-            if ((Object?)player == null
-                || player.GetOwner() != peer.m_uid
-                || player.GetZDOID() != peer.m_characterID)
-            {
-                continue;
-            }
-
-            if ((Object?)livePlayer != null)
-            {
-                return false;
-            }
-
-            livePlayer = player;
-        }
-
-        long playerId = candidate.GetLong(ZDOVars.s_playerID, 0L);
-        ZNetView? liveView = (Object?)livePlayer != null
-            ? livePlayer.GetComponent<ZNetView>()
-            : null;
-        if (playerId == 0L
-            || (Object?)livePlayer == null
-            || livePlayer.GetPlayerID() != playerId
-            || (Object?)liveView == null
-            || !liveView.IsValid()
-            || liveView.GetZDO() != candidate)
-        {
-            return false;
-        }
-
-        character = candidate;
-        return true;
-    }
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3
+
+- Fixed personalized GlobalKey queries for remote players on dedicated servers.
+- Fixed boss and event personal keys not reaching nearby remote players on dedicated servers.
+
 ## 1.0.2
 
 - Fixed dedicated-server admins being rejected by client-side ServerSync checks for `ynw:keys` and `ynw:items refresh`.

@@ -103,31 +103,26 @@ internal static class PlayerKeys
         return removed ? PersonalKeyMutationResult.Removed : PersonalKeyMutationResult.NotPresent;
     }
 
-    private static void GrantToPlayer(Player? player, string? key)
+    private static void GrantToPeer(ZNetPeer? peer, string canonicalKey)
     {
-        if (player == null || !ProgressionIndex.TryRegisterPersonalKey(key, out string canonicalKey))
-        {
-            return;
-        }
-
-        if ((Object?)Player.m_localPlayer != null && (Object)player == (Object)Player.m_localPlayer)
-        {
-            _ = MutateLocal(canonicalKey, add: true);
-            return;
-        }
-
-        long uid = player.GetOwner();
-        ZNet? net = ZNet.instance;
-        ZNetPeer? peer = uid == 0 || (Object?)net == null || !net.IsServer()
-            ? null
-            : net.GetPeer(uid);
-        if (peer == null || !peer.IsReady() || !peer.m_rpc.IsConnected())
+        if (peer == null
+            || !peer.IsReady()
+            || peer.m_rpc == null
+            || !peer.m_rpc.IsConnected())
         {
             YouAreNotWorthyPlugin.Log.LogWarning($"Could not route personal key '{canonicalKey}' to the target player.");
             return;
         }
 
-        peer.m_rpc.Invoke(RpcSetPlayerKeyDirect, canonicalKey);
+        try
+        {
+            peer.m_rpc.Invoke(RpcSetPlayerKeyDirect, canonicalKey);
+        }
+        catch (Exception ex)
+        {
+            YouAreNotWorthyPlugin.Log.LogWarning(
+                $"Could not route personal key '{canonicalKey}' to peer {peer.m_uid}: {ex.Message}");
+        }
     }
 
     internal static void EnsurePlayerRpcRegistered()
@@ -154,17 +149,46 @@ internal static class PlayerKeys
         }
     }
 
-    internal static Player? FindPlayerByOwner(long owner)
+    internal static bool TryGetAuthenticatedPeerCharacter(
+        ZNetPeer? peer,
+        out ZDO character)
     {
-        foreach (Player player in Player.GetAllPlayers())
+        character = null!;
+        ZNet? net = ZNet.instance;
+        ZDOMan? zdoMan = ZDOMan.instance;
+        ZNetScene? scene = ZNetScene.instance;
+        if (peer == null
+            || (Object?)net == null
+            || !net.IsServer()
+            || zdoMan == null
+            || (Object?)scene == null
+            || !peer.IsReady()
+            || peer.m_rpc == null
+            || !peer.m_rpc.IsConnected()
+            || peer.m_characterID.IsNone()
+            || peer.m_characterID.UserID != peer.m_uid
+            || !ReferenceEquals(net.GetPeer(peer.m_uid), peer))
         {
-            if ((Object?)player != null && player.GetOwner() == owner)
-            {
-                return player;
-            }
+            return false;
         }
 
-        return null;
+        ZDO? candidate = zdoMan.GetZDO(peer.m_characterID);
+        if (candidate == null
+            || !candidate.IsValid()
+            || candidate.GetOwner() != peer.m_uid
+            || candidate.GetLong(ZDOVars.s_playerID, 0L) == 0L)
+        {
+            return false;
+        }
+
+        GameObject? prefab = scene.GetPrefab(candidate.GetPrefab());
+        if ((Object?)prefab == null || prefab.GetComponent<Player>() == null)
+        {
+            return false;
+        }
+
+        character = candidate;
+        return true;
     }
 
     internal static bool TryDistributeGlobalKey(string? globalKey, long sender)
@@ -174,15 +198,14 @@ internal static class PlayerKeys
             return false;
         }
 
-        Player? source = FindPlayerByOwner(sender);
-        if ((Object?)source == null)
+        if (!TryGetSenderPosition(sender, out Vector3 sourcePosition))
         {
             YouAreNotWorthyPlugin.Log.LogWarning(
                 $"Could not attribute global key '{globalKey}' to a player; no personal keys were distributed.");
             return false;
         }
 
-        return TryDistributePersonalKeyAt(canonicalKey, ((Component)source).transform.position);
+        return TryDistributePersonalKeyAt(canonicalKey, sourcePosition);
     }
 
     internal static bool TryRequestPersonalKeyAt(
@@ -236,11 +259,32 @@ internal static class PlayerKeys
             return false;
         }
 
-        List<Player> nearby = new();
-        Player.GetPlayersInRange(eventPosition, PersonalKeyGrantRadius, nearby);
-        foreach (Player player in nearby)
+        ZNet? net = ZNet.instance;
+        if ((Object?)net == null || !net.IsServer())
         {
-            GrantToPlayer(player, canonicalKey);
+            return false;
+        }
+
+        if (TryGetLocalServerPlayerPosition(out Vector3 localPosition)
+            && IsWithinGrantRadius(localPosition, eventPosition))
+        {
+            _ = MutateLocal(canonicalKey, add: true);
+        }
+
+        foreach (ZNetPeer peer in net.GetConnectedPeers())
+        {
+            if (!TryGetAuthenticatedPeerCharacter(peer, out ZDO character))
+            {
+                continue;
+            }
+
+            Vector3 peerPosition = character.GetPosition();
+            if (!IsWithinGrantRadius(peerPosition, eventPosition))
+            {
+                continue;
+            }
+
+            GrantToPeer(peer, canonicalKey);
         }
 
         return true;
@@ -281,14 +325,15 @@ internal static class PlayerKeys
         string key,
         Vector3 eventPosition)
     {
-        if ((Object?)ZNet.instance == null || !ZNet.instance.IsServer())
+        ZNet? net = ZNet.instance;
+        if ((Object?)net == null || !net.IsServer())
         {
             YouAreNotWorthyPlugin.Log.LogWarning(
                 $"Ignored non-server personal-key distribution request for '{SanitizeKeyForLog(key)}'.");
             return;
         }
 
-        if (!TryGetReadySenderPlayer(sender, out _))
+        if (!TryGetAuthenticatedPeerCharacter(net.GetPeer(sender), out _))
         {
             YouAreNotWorthyPlugin.Log.LogWarning(
                 $"Ignored personal-key distribution request for '{SanitizeKeyForLog(key)}' from an unready peer.");
@@ -320,32 +365,53 @@ internal static class PlayerKeys
         TryDistributePersonalKeyAt(canonicalKey, eventPosition);
     }
 
-    private static bool TryGetReadySenderPlayer(long sender, out Player player)
+    private static bool TryGetSenderPosition(long sender, out Vector3 position)
     {
-        player = null!;
+        position = Vector3.zero;
         ZNet? net = ZNet.instance;
         if ((Object?)net == null || !net.IsServer())
         {
             return false;
         }
 
-        ZNetPeer? peer = net.GetPeer(sender);
-        Player? candidate = FindPlayerByOwner(sender);
-        if (peer == null
-            || !peer.IsReady()
-            || peer.m_rpc == null
-            || !peer.m_rpc.IsConnected()
-            || peer.m_characterID.IsNone()
-            || peer.m_characterID.UserID != sender
-            || (Object?)candidate == null
-            || candidate.GetOwner() != sender
-            || candidate.GetZDOID() != peer.m_characterID)
+        if (sender == ZNet.GetUID())
+        {
+            return TryGetLocalServerPlayerPosition(out position);
+        }
+
+        if (!TryGetAuthenticatedPeerCharacter(net.GetPeer(sender), out ZDO character))
         {
             return false;
         }
 
-        player = candidate;
-        return true;
+        position = character.GetPosition();
+        return IsFinite(position);
+    }
+
+    private static bool TryGetLocalServerPlayerPosition(out Vector3 position)
+    {
+        position = Vector3.zero;
+        ZNet? net = ZNet.instance;
+        Player? player = Player.m_localPlayer;
+        if ((Object?)net == null
+            || !net.IsServer()
+            || (Object?)player == null
+            || !player.IsOwner()
+            || player.GetZDOID().IsNone()
+            || player.GetPlayerID() == 0L)
+        {
+            return false;
+        }
+
+        position = ((Component)player).transform.position;
+        return IsFinite(position);
+    }
+
+    private static bool IsWithinGrantRadius(Vector3 playerPosition, Vector3 eventPosition)
+    {
+        return IsFinite(playerPosition)
+               && IsFinite(eventPosition)
+               && Vector3.Distance(playerPosition, eventPosition) < PersonalKeyGrantRadius;
     }
 
     private static bool TryValidateRequestedPersonalKey(string? key, out string canonicalKey)
