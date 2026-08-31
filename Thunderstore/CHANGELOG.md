@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+- Added per-character minimap visibility rules through the new ServerSynced `locations.yml`.
+- Added Expand World Data location-prefab resolution while preserving custom icon, size, and animation tokens.
+- Added independent validation, hot reload, and last-known-good handling for location rules.
+
 ## 1.0.3
 
 - Fixed personalized GlobalKey queries for remote players on dedicated servers.

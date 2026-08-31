@@ -48,15 +48,18 @@ state keep their Vanilla behavior.
 - Grants supported event keys to active players within 32 metres of a death,
   interaction, or requesting player.
 - Adds simple creature-defeat keys through `defeatKeys`.
+- Hides configured dedicated location icons until the character earns their key.
 - Gates the final use of tiered items without blocking collection or crafting.
 - Respects the server's actual **Player based raids** setting.
-- Synchronizes the server's `progression.yml` to clients.
+- Synchronizes the server's `progression.yml` and `locations.yml` to clients.
 - Provides admin commands for connected Steam players.
 
 ## Configuration
 
-`defeatKeys` is the only reserved root field. Every other root field is an item
-tier, ordered from lowest to highest.
+YNW creates two independent configuration files. `progression.yml` contains
+creature-defeat keys and ordered item tiers. Its only reserved root field is
+`defeatKeys`; every other root field is an item tier, ordered from lowest to
+highest.
 
 ```yaml
 defeatKeys:
@@ -87,8 +90,29 @@ SerpentItems:
     - SerpentMeat
 ```
 
+`locations.yml` directly maps each `ZoneSystem` location prefab name to one
+required personal key. There is no wrapper field.
+
+```yaml
+Vendor_BlackForest: defeated_eikthyr
+Hildir_camp: defeated_eikthyr
+BogWitch_Camp: defeated_gdking
+Dolmen01: defeated_eikthyr
+```
+
 - Tier names are labels, not biome checks.
 - Creature and resource names are internal prefab/item names.
+- `locations.yml` keys are exact location prefab names, not localized labels,
+  biome names, or minimap display-icon tokens.
+- Expand World Data may keep a custom `iconAlways` or `iconPlaced` token in its
+  own configuration. YNW resolves the originating location prefab and preserves
+  the chosen icon, size, and animation.
+- Omitted prefabs and pins that cannot be resolved to a `ZoneSystem` location
+  remain unrestricted.
+- Use `{}` for an empty `locations.yml`. A former `locationIcons` block in
+  `progression.yml` is not migrated. Former display-token entries are not
+  treated as prefab aliases or migrated; recreate their rules with location
+  prefab names.
 - `defeatKeys` grants its key around the defeated creature; it does not require
   the killing blow.
 - Vanilla and modded defeat global keys normally do not need duplicate
@@ -96,6 +120,11 @@ SerpentItems:
 - Items can inherit tiers through recipes, cooking, fermentation, and smelting.
 - A sequence-form tier has no `requiredKey` and classifies resources without
   restricting them.
+
+The two YAML files are validated, hot-reloaded, ServerSynced, and retained as
+last-known-good state independently. An invalid edit to one does not roll back
+the other, and a remote client applies the server copies in memory without
+overwriting its local files.
 
 ## Item restrictions
 
@@ -124,6 +153,13 @@ Trader and `ConditionalObject` checks use the local character. Raid and spawn
 patches evaluate their supported key conditions against the relevant character
 instead of treating every player as equally progressed. Raid instances, spawn
 timers, opened doors, and spawned network objects remain shared world systems.
+
+Vanilla still shares placed unique-location data with every client. YNW filters
+only configured location prefabs while the minimap builds its runtime pins, so
+different characters can see different trader-location icons. Custom Expand
+World Data display tokens remain intact after YNW uses the transported prefab
+identity for filtering. The raw location data remains shared; unresolved,
+manual, and Vegvisir-created saved pins are unaffected.
 
 ## Mod integration API
 

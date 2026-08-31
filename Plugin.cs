@@ -15,7 +15,7 @@ namespace YouAreNotWorthy;
 public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
 {
     internal const string ModName = "YouAreNotWorthy";
-    internal const string ModVersion = "1.0.3";
+    internal const string ModVersion = "1.0.4";
     internal const string Author = "sighsorry";
     internal const string ModGUID = $"{Author}.{ModName}";
 
@@ -36,8 +36,11 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
 
     private readonly Harmony _harmony = new(ModGUID);
     private CustomSyncedValue<string>? _syncedProgressionYaml;
+    private CustomSyncedValue<string>? _syncedLocationsYaml;
     private FileSystemWatcher? _yamlWatcher;
     private Coroutine? _yamlReloadCoroutine;
+    private bool _progressionReloadPending;
+    private bool _locationsReloadPending;
     private bool _runtimeCleanedUp;
 
     private const float ReloadDelaySeconds = 1f;
@@ -60,18 +63,31 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
                 return;
             }
 
+            if (!LocationIconConfigLoader.LoadOrCreate())
+            {
+                Log.LogError("No valid location-icon configuration is available. The plugin will remain disabled.");
+                CleanupRuntime();
+                enabled = false;
+                return;
+            }
+
             _syncedProgressionYaml = new CustomSyncedValue<string>(
                 ConfigSync,
                 ProgressionConfigLoader.SyncedYamlIdentifier,
                 ProgressionConfigLoader.AppliedYaml);
             _syncedProgressionYaml.ValueChanged += ApplyEffectiveProgressionYaml;
+            _syncedLocationsYaml = new CustomSyncedValue<string>(
+                ConfigSync,
+                LocationIconConfigLoader.SyncedYamlIdentifier,
+                LocationIconConfigLoader.AppliedYaml);
+            _syncedLocationsYaml.ValueChanged += ApplyEffectiveLocationsYaml;
 
             Assembly assembly = Assembly.GetExecutingAssembly();
             _harmony.PatchAll(assembly);
             PlayerKeyCommands.RegisterConsoleCommand();
             ItemReferenceCommands.RegisterConsoleCommand();
 
-            SetupProgressionWatcher();
+            SetupYamlWatcher();
             IsApiReady = true;
             Log.LogInfo($"{ModName} {ModVersion} loaded.");
         }
@@ -115,11 +131,20 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
                 "progression sync handler");
         }
 
+        CustomSyncedValue<string>? syncedLocationsYaml = _syncedLocationsYaml;
+        _syncedLocationsYaml = null;
+        if (syncedLocationsYaml != null)
+        {
+            TryCleanup(
+                () => syncedLocationsYaml.ValueChanged -= ApplyEffectiveLocationsYaml,
+                "locations sync handler");
+        }
+
         FileSystemWatcher? yamlWatcher = _yamlWatcher;
         _yamlWatcher = null;
         if (yamlWatcher != null)
         {
-            TryCleanup(yamlWatcher.Dispose, "progression file watcher");
+            TryCleanup(yamlWatcher.Dispose, "YAML file watcher");
         }
 
         Coroutine? yamlReloadCoroutine = _yamlReloadCoroutine;
@@ -128,13 +153,17 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
         {
             TryCleanup(
                 () => StopCoroutine(yamlReloadCoroutine),
-                "progression reload coroutine");
+                "YAML reload coroutine");
         }
+
+        _progressionReloadPending = false;
+        _locationsReloadPending = false;
 
         TryCleanup(ItemReferenceCommands.Shutdown, "item reference command");
         TryCleanup(PlayerKeyCommands.Shutdown, "player key command");
         TryCleanup(KeyReferenceWriter.Shutdown, "key reference writer");
         TryCleanup(ItemReferenceWriter.Shutdown, "item reference writer");
+        TryCleanup(LocationIconIdentityTransport.Clear, "location icon identity cache");
         TryCleanup(_harmony.UnpatchSelf, "Harmony patches");
     }
 
@@ -150,7 +179,7 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
         }
     }
 
-    private void SetupProgressionWatcher()
+    private void SetupYamlWatcher()
     {
         Directory.CreateDirectory(ProgressionConfigLoader.ConfigDirectory);
 
@@ -159,49 +188,75 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
             IncludeSubdirectories = false,
             SynchronizingObject = ThreadingHelper.SynchronizingObject
         };
-        _yamlWatcher.Changed += ReloadProgressionConfig;
-        _yamlWatcher.Created += ReloadProgressionConfig;
-        _yamlWatcher.Renamed += ReloadProgressionConfig;
-        _yamlWatcher.Deleted += ReloadProgressionConfig;
-        _yamlWatcher.Error += ReloadProgressionConfigAfterWatcherError;
+        _yamlWatcher.Changed += ReloadYamlConfiguration;
+        _yamlWatcher.Created += ReloadYamlConfiguration;
+        _yamlWatcher.Renamed += ReloadYamlConfiguration;
+        _yamlWatcher.Deleted += ReloadYamlConfiguration;
+        _yamlWatcher.Error += ReloadYamlConfigurationAfterWatcherError;
         _yamlWatcher.EnableRaisingEvents = true;
     }
 
-    private void ReloadProgressionConfig(object sender, FileSystemEventArgs e)
+    private void ReloadYamlConfiguration(object sender, FileSystemEventArgs e)
     {
-        if (!IsTrackedYamlChange(e))
+        bool reloadProgression = IsTrackedYamlChange(e, ProgressionConfigLoader.ConfigFileName);
+        bool reloadLocations = IsTrackedYamlChange(e, LocationIconConfigLoader.ConfigFileName);
+        if (!reloadProgression && !reloadLocations)
         {
             return;
         }
 
-        ScheduleProgressionReload();
+        _progressionReloadPending |= reloadProgression;
+        _locationsReloadPending |= reloadLocations;
+        ScheduleYamlReload();
     }
 
-    private void ReloadProgressionConfigAfterWatcherError(object sender, ErrorEventArgs e)
+    private void ReloadYamlConfigurationAfterWatcherError(object sender, ErrorEventArgs e)
     {
-        Log.LogWarning($"YNW YAML file watcher error; scheduling a full progression.yml reload: {e.GetException()}");
-        ScheduleProgressionReload();
+        Log.LogWarning($"YNW YAML file watcher error; scheduling a full configuration reload: {e.GetException()}");
+        _progressionReloadPending = true;
+        _locationsReloadPending = true;
+        ScheduleYamlReload();
     }
 
-    private void ScheduleProgressionReload()
+    private void ScheduleYamlReload()
     {
         if (_yamlReloadCoroutine != null)
         {
             StopCoroutine(_yamlReloadCoroutine);
         }
 
-        _yamlReloadCoroutine = StartCoroutine(ReloadProgressionAfterQuietPeriod());
+        _yamlReloadCoroutine = StartCoroutine(ReloadYamlAfterQuietPeriod());
     }
 
-    private IEnumerator ReloadProgressionAfterQuietPeriod()
+    private IEnumerator ReloadYamlAfterQuietPeriod()
     {
         yield return new WaitForSecondsRealtime(ReloadDelaySeconds);
+        bool reloadProgression = _progressionReloadPending;
+        bool reloadLocations = _locationsReloadPending;
+        bool progressionReloaded = !reloadProgression;
+        bool locationsReloaded = !reloadLocations;
+
         for (int attempt = 1; attempt <= ReloadAttempts; attempt++)
         {
-            if (ProgressionConfigLoader.TryReadValidLocalYaml(out string yaml))
+            if (!progressionReloaded
+                && ProgressionConfigLoader.TryReadValidLocalYaml(out string progressionYaml))
             {
-                ApplyReloadedProgressionYaml(yaml);
-                yield break;
+                ApplyReloadedProgressionYaml(progressionYaml);
+                progressionReloaded = true;
+                _progressionReloadPending = false;
+            }
+
+            if (!locationsReloaded
+                && LocationIconConfigLoader.TryReadValidLocalYaml(out string locationsYaml))
+            {
+                ApplyReloadedLocationsYaml(locationsYaml);
+                locationsReloaded = true;
+                _locationsReloadPending = false;
+            }
+
+            if (progressionReloaded && locationsReloaded)
+            {
+                break;
             }
 
             if (attempt < ReloadAttempts)
@@ -210,7 +265,23 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
             }
         }
 
-        Log.LogError("Keeping the current effective progression.yml configuration.");
+        if (!progressionReloaded)
+        {
+            Log.LogError("Keeping the current effective progression.yml configuration.");
+            _progressionReloadPending = false;
+        }
+
+        if (!locationsReloaded)
+        {
+            Log.LogError("Keeping the current effective locations.yml configuration.");
+            _locationsReloadPending = false;
+        }
+
+        _yamlReloadCoroutine = null;
+        if (_progressionReloadPending || _locationsReloadPending)
+        {
+            ScheduleYamlReload();
+        }
     }
 
     private void ApplyReloadedProgressionYaml(string yaml)
@@ -243,6 +314,37 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
         RefreshProgressionDependents();
         _syncedProgressionYaml.AssignLocalValue(yaml);
         Log.LogInfo("progression.yml reloaded and synchronized.");
+    }
+
+    private void ApplyReloadedLocationsYaml(string yaml)
+    {
+        if (_syncedLocationsYaml == null)
+        {
+            return;
+        }
+
+        if (IsRemoteClientAwaitingInitialSync())
+        {
+            _syncedLocationsYaml.LocalBaseValue = yaml;
+            Log.LogInfo("Local locations.yml validated and queued for use outside the pending server session.");
+            return;
+        }
+
+        if (!ConfigSync.IsSourceOfTruth)
+        {
+            _syncedLocationsYaml.AssignLocalValue(yaml);
+            Log.LogInfo("Local locations.yml validated; the server-synchronized configuration remains active.");
+            return;
+        }
+
+        if (!LocationIconConfigLoader.ApplyLocalYaml(yaml))
+        {
+            Log.LogError("Keeping the last-known-good YNW locations.yml configuration.");
+            return;
+        }
+
+        _syncedLocationsYaml.AssignLocalValue(yaml);
+        Log.LogInfo("locations.yml reloaded and synchronized.");
     }
 
     private void ApplyEffectiveProgressionYaml()
@@ -290,20 +392,65 @@ public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
         }
     }
 
-    private static bool IsTrackedYamlChange(FileSystemEventArgs e)
+    private void ApplyEffectiveLocationsYaml()
     {
-        if (IsTrackedYamlFile(e.Name))
+        try
+        {
+            if (_syncedLocationsYaml == null)
+            {
+                return;
+            }
+
+            string yaml = _syncedLocationsYaml.Value;
+            if (ConfigSync.IsSourceOfTruth
+                && ConfigSync.ProcessingServerUpdate
+                && (UnityEngine.Object?)ZNet.instance != null
+                && ZNet.instance.IsServer())
+            {
+                if (!string.Equals(yaml, LocationIconConfigLoader.AppliedYaml, StringComparison.Ordinal))
+                {
+                    Log.LogWarning("Ignored a client attempt to replace the server-authoritative locations.yml.");
+                    _syncedLocationsYaml.Value = LocationIconConfigLoader.AppliedYaml;
+                }
+
+                return;
+            }
+
+            if (ConfigSync.IsSourceOfTruth
+                && string.Equals(yaml, LocationIconConfigLoader.AppliedYaml, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (!LocationIconConfigLoader.ApplySyncedYaml(yaml))
+            {
+                Log.LogError("Rejected the synchronized locations.yml; keeping the last-known-good configuration.");
+                return;
+            }
+
+            Log.LogInfo("Effective locations.yml updated from ServerSync.");
+        }
+        catch (Exception ex)
+        {
+            Log.LogError($"Failed to apply the ServerSync locations.yml: {ex}");
+        }
+    }
+
+    private static bool IsTrackedYamlChange(FileSystemEventArgs e, string trackedFileName)
+    {
+        if (IsTrackedYamlFile(e.Name, trackedFileName))
         {
             return true;
         }
 
-        return e is RenamedEventArgs renamed && IsTrackedYamlFile(renamed.OldName);
+        return e is RenamedEventArgs renamed
+               && IsTrackedYamlFile(renamed.OldName, trackedFileName);
     }
 
-    private static bool IsTrackedYamlFile(string? name)
+    private static bool IsTrackedYamlFile(string? name, string trackedFileName)
     {
         string fileName = Path.GetFileName(name ?? string.Empty);
-        return string.Equals(fileName, ProgressionConfigLoader.ConfigFileName, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(fileName, trackedFileName, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsRemoteClientAwaitingInitialSync()

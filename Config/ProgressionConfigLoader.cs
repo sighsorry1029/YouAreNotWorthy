@@ -184,6 +184,13 @@ internal static class ProgressionConfigLoader
                 continue;
             }
 
+            if (string.Equals(name, "locationIcons", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add(
+                    $"Root entry '{name}' is not valid in progression.yml; configure location icons in locations.yml.");
+                continue;
+            }
+
             if (!tierIds.Add(name))
             {
                 errors.Add($"Duplicate item tier id '{name}'.");

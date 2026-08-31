@@ -1,7 +1,8 @@
-# YouAreNotWorthy 기능 및 `progression.yml` 스키마
+# YouAreNotWorthy 기능 및 YAML 스키마
 
-> 현재 스키마는 단일 `progression.yml` 문서다. 이전 versioned
-> `progression.yml`과 별도 `ResourceMap.yml`은 지원·변환·삭제하지 않는다.
+> 현재 설정은 역할이 분리된 `progression.yml`과 `locations.yml` 문서다. 이전 versioned
+> `progression.yml`, 별도 `ResourceMap.yml`, `progression.yml` 안의 `locationIcons`는
+> 지원·변환·삭제하지 않는다.
 
 ## 1. 기능 개요
 
@@ -15,6 +16,7 @@ YNW는 값이 없고 예약되지 않은 boolean global key를 캐릭터별 nati
 
 ```text
 BepInEx/config/YouAreNotWorthy/progression.yml
+BepInEx/config/YouAreNotWorthy/locations.yml
 ```
 
 source-of-truth인 서버/listen host는 world가 로드된 뒤 다음 정보 파일도 생성한다.
@@ -140,7 +142,64 @@ BlackForest:
 unique key를 검사한다. YNW가 개인화한 `defeated_eikthyr`, Vanilla native player key,
 또는 `defeatKeys`가 만든 사용자 key를 모두 사용할 수 있다.
 
-## 3. 자동 요구 문구
+## 3. `locations.yml` 구조
+
+`locations.yml`은 wrapper 없이 정확한 `ZoneSystem` location prefab 이름을 요구 personal
+key 하나에 직접 연결한다.
+
+```yaml
+Vendor_BlackForest: defeated_eikthyr
+Hildir_camp: defeated_eikthyr
+BogWitch_Camp: defeated_gdking
+```
+
+번역된 지도 이름, biome 이름 또는 Minimap 표시 아이콘 token을 쓰지 않는다. prefab 이름의
+대소문자는 비교에서 무시하고 정확한 `(Clone)` suffix는 제거한다. 같은 prefab을 정규화 후
+두 번 선언할 수 없다. prefab과 key는 모두 비어 있지 않은 scalar여야 하며 배열이나 객체형
+조건은 허용하지 않는다. 제한하지 않을 prefab은 mapping에서 생략하고,
+아무 아이콘도 제한하지 않으려면 문서 전체를 `{}`로 쓴다.
+
+`progression.yml`의 이전 `locationIcons` block은 읽거나 자동 이전하지 않는다. Minimap
+display token을 key로 쓴 이전 `locations.yml` entry도 prefab alias로 해석하거나 이전하지
+않는다. 현재 location prefab 이름으로 rule을 직접 다시 작성해야 한다.
+
+Vanilla에서 `m_iconPlaced` location이 처음 배치되면 위치 목록은 모든 클라이언트에게
+공유된다. YNW는 server가 아이콘을 전송하는 동안 원래 location prefab identity를 함께
+운반하고, client가 이를 별도 cache한 뒤 Minimap에 넘기기 전에 표시 token에서 제거한다.
+각 client는 runtime location pin을 갱신할 때 prefab과 현재 캐릭터 key를 비교한다. 따라서
+key를 얻거나 삭제하면 Vanilla의 다음 지도 갱신 주기인 최대 약 5초 안에 아이콘이 나타나거나
+사라진다.
+
+기본 설정의 대상은 다음과 같다.
+
+| location prefab | 실제 Vanilla biome | 요구 personal key |
+|---|---|---|
+| `Vendor_BlackForest` | BlackForest | `defeated_eikthyr` |
+| `Hildir_camp` | Meadows | `defeated_eikthyr` |
+| `BogWitch_Camp` | Swamp | `defeated_gdking` |
+
+Expand World Data에서도 `locations.yml`에는 항상 EWD entry의 `prefab`을 쓴다. EWD 자체
+설정의 `iconAlways` 또는 `iconPlaced`에는 명시적 표시 token을 그대로 둘 수 있다.
+
+```yaml
+# Expand World Data configuration
+- prefab: Dolmen01
+  iconAlways: Hammer,2,pulse
+
+# YouAreNotWorthy locations.yml
+Dolmen01: defeated_eikthyr
+```
+
+이 경우 YNW는 `Dolmen01` identity로 key를 검사한다. EWD가 선택한 `Hammer` 아이콘, 크기
+`2`, pulse animation은 client에서 원래 token으로 복원되므로 그대로 유지된다. 서로 다른
+location이 같은 표시 token을 사용해도 각 prefab에 서로 다른 key를 줄 수 있다.
+
+이는 정상 Minimap 표시의 개인화이지 위치 정보 은닉이나 anti-cheat 기능이 아니다. 원본
+위치는 클라이언트에 남는다. 수신된 아이콘을 `ZoneSystem` location instance에 연결할 수
+없으면 YNW는 fail-open하여 숨기지 않는다. 일반 수동 pin과 `Minimap.DiscoverLocation`/
+Vegvisir가 저장한 pin도 이 runtime location-icon 경로를 사용하지 않으므로 영향받지 않는다.
+
+## 4. 자동 요구 문구
 
 `requirementText`는 YAML에 저장하지 않는다. 아이템을 실제로 검사하거나 tooltip을 만들
 때 `requiredKey`의 출처와 현재 Valheim 언어를 사용하여 두 번째 줄을 계산한다.
@@ -223,7 +282,7 @@ prefab이 발견되면 일반 `Defeat ...!` 규칙을 따른다.
 cache를 무효화하고 해당 언어의 번역 파일을 다시 읽는다. `keys.reference.yml`을 읽어
 문구를 만들지는 않는다.
 
-## 4. Resource 이름과 tier 계산
+## 5. Resource 이름과 tier 계산
 
 Resource에는 prefab 또는 `$item_*` 같은 내부 item token을 쓴다. 현재 언어로 번역된
 표시 이름을 설정에 쓰면 안 된다.
@@ -256,7 +315,7 @@ tier가 더 높으면 직접 tier가 우선한다. 순환 경로는 중단한다
 최고 입력이 Ocean resource라면 그 결과는 허용된다. 누적 gate가 필요하면 해당 상위
 tier에도 `requiredKey`를 명시해야 한다.
 
-## 5. 실제 item restriction
+## 6. 실제 item restriction
 
 플레이어가 계산된 tier의 `requiredKey`를 가지고 있지 않을 때 다음 최종 사용 경로를
 차단한다.
@@ -279,7 +338,7 @@ InventorySlots는 soft dependency다. 설치되어 있으면 일반 equip 판정
 non-quick 전용 장비 slot 경로도 보호한다. Quick slot에 넣는 행위 자체는 막지 않지만
 실제 장착·소비 단계에서 다시 검사한다.
 
-### 5.1 `items.reference.yml`
+### 6.1 `items.reference.yml`
 
 source-of-truth 서버/listen host는 effective item resolver가 준비되면 다음 형식의 읽기 전용
 reference를 생성한다.
@@ -348,9 +407,9 @@ key item도 `resources`에 직접 명시되거나 생산 경로를 통해 tier�
 
 즉 progression을 건너뛰어 아이템을 얻거나 제작해도 최종 장착·소비·소환 시점에 제한한다.
 
-## 6. Global-key 개인화
+## 7. Global-key 개인화
 
-### 6.1 분류
+### 7.1 분류
 
 YNW는 처음 만난 값 없는 비예약 boolean global key를 personal key로 등록한다. 다음은
 world state로 유지한다.
@@ -360,13 +419,13 @@ world state로 유지한다.
 - `PlayerEvents`, `activeBosses`, `AshlandsOcean` 같은 공유 옵션·상태
 - `season_winter`, `season_fall`, `season_summer`, `season_spring`
 
-### 6.2 읽기
+### 7.2 읽기
 
 `ZoneSystem.GetGlobalKey(string|GlobalKeys)`가 personal boolean key를 조회하면 world set
 대신 해당 플레이어의 native unique key를 검사한다. Trader, `ConditionalObject` 및 같은
 Vanilla global-key 조회 경로를 쓰는 mod가 이 동작을 공유한다.
 
-### 6.3 쓰기
+### 7.3 쓰기
 
 Personal boolean key write는 world에 기록하지 않고 사건 위치 32m 안의 활성 플레이어에게
 같은 이름의 native unique key를 지급한다.
@@ -382,9 +441,9 @@ Personal boolean key write는 world에 기록하지 않고 사건 위치 32m 안
 추측해 personal key를 지급하지 않는다. 공유/value key write는 Vanilla대로 world에
 저장한다.
 
-## 7. 관리자 명령
+## 8. 관리자 명령
 
-### 7.1 Personal key
+### 8.1 Personal key
 
 서버 관리자는 Steam backend로 접속 중인 계정이 현재 사용하는 캐릭터의 native unique
 key를 조회·추가·삭제할 수 있다.
@@ -423,7 +482,7 @@ offline profile을 열거나 수정하지 않고, 접속 중인 `Player`와 현�
 명령에는 server-admin 권한만 필요하다. admin+debug는 item restriction 우회 조건이며 이
 명령의 추가 조건이 아니다.
 
-### 7.2 Item reference 갱신
+### 8.2 Item reference 갱신
 
 ```text
 ynw:items refresh
@@ -440,7 +499,7 @@ ynw:items refresh
 확인한 뒤 실행해야 한다. 내용이 동일하면 파일 timestamp를 유지하며, world runtime이 아직
 준비되지 않았거나 쓰기에 실패하면 완료로 보고하지 않는다.
 
-## 8. Raid와 spawn
+## 9. Raid와 spawn
 
 YNW는 `PlayerEvents`를 강제로 켜거나 끄지 않고 서버의 실제 **Player based raids** 값을
 따른다.
@@ -457,24 +516,25 @@ spawn 후보가 된다. `CreatureSpawner`의 required/blocking personal key도 t
 같은 플레이어 snapshot으로 평가한다. Timer, roll, cap, group, raid instance와 생성된
 network object는 공유 world system으로 남는다.
 
-## 9. ServerSync, hot reload, LKG
+## 10. ServerSync, hot reload, LKG
 
-`progression.yml` 원문 하나가 검증·적용·동기화의 단위다.
+`progression.yml`과 `locations.yml`은 서로 독립적인 검증·적용·동기화 단위다.
 
-1. 시작 시 로컬 `progression.yml`을 읽고 전체 schema를 검증한다.
-2. source-of-truth 서버/listen host의 유효한 원문을 하나의 ServerSync 값으로 전송한다.
-3. 클라이언트는 받은 원문 전체를 다시 검증한 뒤 런타임 상태를 한 번에 교체한다.
-4. 실패하면 현재 last-known-good 문서 전체를 유지한다.
+1. 시작 시 로컬 두 파일을 각각 읽고 해당 schema를 검증한다.
+2. source-of-truth 서버/listen host는 유효한 두 원문을 별도 ServerSync 값으로 전송한다.
+3. 클라이언트는 받은 원문을 각각 다시 검증한 뒤 해당 런타임 상태만 교체한다.
+4. 한 파일이 실패하면 그 파일의 last-known-good 상태만 유지하며 다른 파일은 영향받지 않는다.
 
-클라이언트는 server YAML을 메모리에만 적용하고 로컬 `progression.yml`을 덮어쓰지 않는다.
-연결 중 로컬 편집은 현재 서버 설정을 바꾸지 않으며 연결 밖에서 쓸 fallback으로 남는다.
-최초 실행에 유효한 로컬 파일이 없으면 embedded default를 생성해 적용한다.
+두 파일은 독립적으로 hot reload된다. 클라이언트는 server YAML을 메모리에만 적용하고 로컬
+`progression.yml`이나 `locations.yml`을 덮어쓰지 않는다. 연결 중 로컬 편집은 현재 서버
+설정을 바꾸지 않으며 연결 밖에서 쓸 fallback으로 남는다. 최초 실행에 로컬 파일이 없으면
+각 embedded default를 생성해 적용한다.
 
 별도의 BepInEx `.cfg` 동기화 channel은 없다. `ConfigSync`는 authoritative YAML 전송과
 server/admin 및 version 상태 확인에만 내부적으로 사용한다. YNW는 모든 peer에 같은
 version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기화하지 않는다.
 
-## 10. 검증 규칙
+## 11. 검증 규칙
 
 다음은 `progression.yml` 전체를 거부한다.
 
@@ -496,7 +556,15 @@ version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기�
 `BlackForrest` 오타도 유효한 custom tier가 될 수 있다. 대신 그 값의 형태와 하위 필드는
 엄격하게 검증한다.
 
-## 11. 내장 기본 tier
+다음은 `locations.yml` 전체를 거부하고 location 설정의 기존 LKG만 유지한다.
+
+- YAML root가 mapping이 아님 (`{}`는 유효함)
+- location prefab 또는 required key가 비어 있거나 scalar가 아님
+- location prefab이 정규화 후 중복됨
+- 문서 안에서 같은 required key의 canonical casing이 충돌함
+- value-bearing/shared world key를 required personal key로 등록하려 함
+
+## 12. 내장 기본 tier
 
 기본 `defeatKeys`에는 `Serpent` 사망 위치 32m 안의 활성 플레이어에게
 `defeat_serpent`를 지급하는 rule이 하나 있다. 기본 tier 순서와 gate는 다음과 같다.
@@ -518,12 +586,15 @@ version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기�
 그 tier를 상속한 아이템에 `defeat_serpent`를 요구한다. 기본 resource 112개는 정규화 후
 모두 고유하다.
 
-## 12. 레거시와 제한
+## 13. 레거시와 제한
 
 - 제거된 `killKeys` 이름은 alias로 읽지 않으며, 기본 custom key `killed_serpent`도
   `defeat_serpent`로 migration하지 않는다.
 - 이전 `version: 4` 및 v1-v3 형식은 현재 스키마로 변환하지 않는다.
 - 기존 별도 `ResourceMap.yml`은 읽거나 자동 병합하거나 삭제하지 않는다.
+- `progression.yml`의 제거된 `locationIcons` block은 읽거나 `locations.yml`로 이전하지 않는다.
+- Minimap display token을 key로 쓴 이전 `locations.yml` entry는 prefab alias로 해석하거나
+  자동 이전하지 않는다.
 - 제거된 `itemTiers`, `requirementText`, trigger/action, counter 필드를 지원하지 않는다.
 - 이전 번역 필드명이나 파일 형식의 alias·migration은 지원하지 않고 현재 다섯 필드만 읽는다.
 - 기존 counter custom data를 읽거나 삭제하지 않는다.
@@ -539,11 +610,11 @@ version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기�
 
 기존 파일은 복구를 위해 사용자가 직접 보관·삭제할 수 있도록 YNW가 손대지 않는다.
 
-## 13. 검증 체크리스트
+## 14. 검증 체크리스트
 
 1. 서버와 모든 클라이언트의 YNW version을 맞춘다.
 2. 기존 YAML, world와 character를 백업한다.
-3. 로그에서 `progression.yml` 검증과 ServerSync 적용 성공을 확인한다.
+3. 로그에서 `progression.yml`과 `locations.yml`의 독립 검증 및 ServerSync 적용 성공을 확인한다.
 4. 서로 다른 key를 가진 두 플레이어로 trader, raid, spawn 및 item 결과를 비교한다.
 5. 직접 분류 item과 recipe/cooking/fermenting/smelting 상속 item을 각각 시험한다.
 6. 장착, `AmmoNonEquipable`, 음식/potion, 직접 OfferingBowl 공물과 item-stand 소환을
@@ -555,7 +626,8 @@ version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기�
 10. 게임을 재시작하거나 다른 언어로 전환했다가 돌아온 뒤 해당 로컬 번역 파일이 적용되고
    기존 언어 이름이 cache에 남지 않는지 확인한다.
 11. admin 단독, debug 단독, admin+debug를 구분해 시험한다.
-12. YAML을 일부러 잘못 편집해 이전 LKG가 유지되는지 확인한다.
+12. 두 YAML을 하나씩 잘못 편집해 해당 파일의 이전 LKG만 유지되고 다른 설정은 정상 reload되는지
+    확인한다.
 13. 사망·Hildir 반납·OfferingBowl·Vegvisir 사건의 31.9m/32.1m 경계를 확인한다.
 14. 비관리자/관리자, 잘못된 SteamID64, 로그아웃한 대상, `add`/`list`/`remove`, 제거 뒤
     정상 사건에 의한 재지급을 확인한다.
@@ -574,3 +646,7 @@ version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기�
 20. 연결된 비관리자의 `ynw:items refresh`는 서버에서 거부되고, 관리자의 요청은 서버 파일만
     갱신하며 결과가 요청자 콘솔에 돌아오는지 확인한다. 같은 내용을 다시 갱신했을 때 timestamp가
     유지되는지도 확인한다.
+21. 서로 다른 personal key를 가진 두 플레이어로 Vanilla location prefab과 EWD custom
+    `iconAlways`/`iconPlaced` location을 시험한다. EWD location은 `locations.yml`에 prefab으로
+    설정하고, key 변경 후 약 5초 안에 아이콘이 갱신되면서 원래 icon·size·animation이
+    유지되는지 확인한다. location instance로 해석할 수 없는 임의 pin은 표시되는지도 확인한다.
