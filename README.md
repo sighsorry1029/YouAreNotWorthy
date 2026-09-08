@@ -227,3 +227,9 @@ in which each `requiredKey` first appears in `progression.yml`, then prefab name
 
 Both files are generated reference material. YNW does not read them as
 configuration or send them through ServerSync, so editing them has no effect.
+
+## Development verification
+
+See the [verification guide](https://github.com/sighsorry1029/YouAreNotWorthy/blob/main/Verification/README.md) for build commands and the
+managed regression harness. The harness checks installed game method bodies and
+item-tier resolution; multiplayer behavior still requires an in-game check.

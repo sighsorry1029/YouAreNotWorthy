@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.5
+
+- Reduced allocations during repeated item-tier checks and personal-key grants while preserving progression rules.
+- Consolidated identical administrator RPC checks without changing authorization or network messages.
+- Added a reproducible managed regression harness for item-tier resolution and spawn/death transpilers.
+- Added automatic local game DLL updates after successful Debug builds with `DeployToGame=true`.
+- Removed outdated resource counts from the progression documentation.
+
 ## 1.0.4
 
 - Added per-character minimap visibility rules through the new ServerSynced `locations.yml`.

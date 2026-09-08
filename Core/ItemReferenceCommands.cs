@@ -153,7 +153,7 @@ internal static class ItemReferenceCommands
             return;
         }
 
-        if (!IsRemoteAdmin(requester))
+        if (!DirectPeerChecks.IsRemoteAdmin(requester))
         {
             YouAreNotWorthyPlugin.Log.LogWarning(
                 $"Rejected a YNW item-reference refresh from non-admin peer '{GetPeerHostName(requester)}'.");
@@ -203,7 +203,7 @@ internal static class ItemReferenceCommands
             return;
         }
 
-        if (!IsServerConnection(server))
+        if (!DirectPeerChecks.IsServerConnection(server))
         {
             YouAreNotWorthyPlugin.Log.LogWarning(
                 "Ignored a YNW item-reference result from a non-server connection.");
@@ -231,39 +231,6 @@ internal static class ItemReferenceCommands
         {
             YouAreNotWorthyPlugin.Log.LogWarning(
                 $"Failed to return a YNW item-reference result: {ex.Message}");
-        }
-    }
-
-    private static bool IsRemoteAdmin(ZRpc requester)
-    {
-        try
-        {
-            ZNet? net = ZNet.instance;
-            ZNetPeer? peer = net?.GetConnectedPeers().Find(
-                candidate => ReferenceEquals(candidate.m_rpc, requester));
-            return (Object?)net != null
-                   && net.IsServer()
-                   && peer != null
-                   && peer.IsReady()
-                   && ReferenceEquals(peer.m_rpc, requester)
-                   && net.IsAdmin(peer.m_socket.GetHostName());
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
-    private static bool IsServerConnection(ZRpc rpc)
-    {
-        try
-        {
-            ZNetPeer? peer = ZNet.instance?.GetServerPeer();
-            return peer != null && peer.m_server && ReferenceEquals(peer.m_rpc, rpc);
-        }
-        catch (Exception)
-        {
-            return false;
         }
     }
 

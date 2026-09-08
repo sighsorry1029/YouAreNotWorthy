@@ -569,21 +569,22 @@ version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기�
 기본 `defeatKeys`에는 `Serpent` 사망 위치 32m 안의 활성 플레이어에게
 `defeat_serpent`를 지급하는 rule이 하나 있다. 기본 tier 순서와 gate는 다음과 같다.
 
-| rank | tier | resource 수 | requiredKey |
-|---:|---|---:|---|
-| 0 | `Meadows` | 15 | 없음 |
-| 1 | `BlackForest` | 16 | `defeated_eikthyr` |
-| 2 | `Swamp` | 13 | `defeated_gdking` |
-| 3 | `Ocean` | 2 | `defeated_gdking` |
-| 4 | `SerpentItems` | 1 | `defeat_serpent` |
-| 5 | `Mountain` | 10 | `defeated_bonemass` |
-| 6 | `Plains` | 14 | `defeated_dragon` |
-| 7 | `Mistlands` | 19 | `defeated_goblinking` |
-| 8 | `AshLands` | 22 | `defeated_queen` |
+| rank | tier | requiredKey |
+|---:|---|---|
+| 0 | `Meadows` | 없음 |
+| 1 | `BlackForest` | `defeated_eikthyr` |
+| 2 | `Swamp` | `defeated_gdking` |
+| 3 | `Ocean` | `defeated_gdking` |
+| 4 | `SerpentItems` | `defeat_serpent` |
+| 5 | `Mountain` | `defeated_bonemass` |
+| 6 | `Plains` | `defeated_dragon` |
+| 7 | `Mistlands` | `defeated_goblinking` |
+| 8 | `AshLands` | `defeated_queen` |
 
 `Meadows`는 분류 기준이지만 제한하지 않는다. `Ocean`은 Swamp와 같은 Elder 진행 key를
 요구한다. `SerpentItems`는 실제 biome 판정이 아닌 별도 tier label이며 `SerpentMeat`와
-그 tier를 상속한 아이템에 `defeat_serpent`를 요구한다. 기본 resource 112개는 정규화 후
+그 tier를 상속한 아이템에 `defeat_serpent`를 요구한다. 기본 resource 목록은
+[progression.default.yml](../Config/progression.default.yml)을 기준으로 하며, 정규화 후
 모두 고유하다.
 
 ## 13. 레거시와 제한

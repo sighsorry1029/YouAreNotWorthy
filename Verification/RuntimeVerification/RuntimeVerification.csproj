@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../environment.props" Condition="Exists('../../environment.props')" />
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>YNW.RuntimeVerification</AssemblyName>
+    <CorlibPath Condition="'$(CorlibPath)' == ''">$(ValheimGamePath)/valheim_Data/Managed</CorlibPath>
+    <PublicizedAssembliesPath Condition="'$(PublicizedAssembliesPath)' == ''">$(CorlibPath)/publicized_assemblies</PublicizedAssembliesPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="assembly_valheim">
+      <HintPath>$(PublicizedAssembliesPath)/assembly_valheim_publicized.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(CorlibPath)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The standalone .NET verifier uses this pinned Harmony API, not the game's Mono loader. -->
+    <PackageReference Include="Lib.Harmony" Version="2.4.1" />
+  </ItemGroup>
+  <Target Name="ValidateGameReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(PublicizedAssembliesPath)/assembly_valheim_publicized.dll')"
+           Text="Publicized Valheim assembly not found. Set ValheimGamePath or PublicizedAssembliesPath with an MSBuild -p: override." />
+    <Error Condition="!Exists('$(CorlibPath)/UnityEngine.CoreModule.dll')"
+           Text="UnityEngine.CoreModule.dll not found. Set ValheimGamePath or CorlibPath with an MSBuild -p: override." />
+  </Target>
+</Project>

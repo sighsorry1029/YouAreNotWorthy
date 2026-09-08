@@ -259,14 +259,18 @@ internal static class RestrictionEvaluator
         ResolverState? state,
         CompiledItemTier? direct)
     {
-        return state == null
-            ? direct
-            : Higher(
-                direct,
-                ResolveTier(
-                    state,
-                    GetResolverSharedData(item),
-                    new HashSet<SharedData>()));
+        if (state == null)
+        {
+            return direct;
+        }
+
+        SharedData shared = GetResolverSharedData(item);
+        if (!state.ResolvedTiers.TryGetValue(shared, out CompiledItemTier? resolved))
+        {
+            resolved = ResolveTier(state, shared, new HashSet<SharedData>());
+        }
+
+        return Higher(direct, resolved);
     }
 
     private static SharedData GetResolverSharedData(ItemDrop.ItemData item)

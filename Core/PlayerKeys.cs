@@ -77,18 +77,21 @@ internal static class PlayerKeys
             return PersonalKeyMutationResult.NoLocalPlayer;
         }
 
-        List<string> storedKeys = FindNativeKeys(player, canonicalKey);
         if (add)
         {
-            if (storedKeys.Count > 0)
+            foreach (string nativeKey in player.GetUniqueKeys())
             {
-                return PersonalKeyMutationResult.AlreadyPresent;
+                if (string.Equals(nativeKey, canonicalKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    return PersonalKeyMutationResult.AlreadyPresent;
+                }
             }
 
             player.AddUniqueKey(canonicalKey);
             return PersonalKeyMutationResult.Added;
         }
 
+        List<string> storedKeys = FindNativeKeys(player, canonicalKey);
         if (storedKeys.Count == 0)
         {
             return PersonalKeyMutationResult.NotPresent;
