@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -16,33 +15,14 @@ internal static class ItemReferenceCommands
     private const int MaxPeerNameLength = 128;
 
     private static readonly List<string> TabOptions = new() { "refresh" };
-    private static readonly FieldInfo? TerminalCommandsField = typeof(Terminal).GetField(
-        "commands",
-        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-
     private static Terminal.ConsoleCommand? _consoleCommand;
     private static bool _shutdown;
 
     internal static void RegisterConsoleCommand()
     {
         _shutdown = false;
-        if (_consoleCommand != null)
+        if (_consoleCommand != null || !ConsoleCommandRegistry.CanRegister(CommandName))
         {
-            return;
-        }
-
-        Dictionary<string, Terminal.ConsoleCommand>? commands = GetTerminalCommands();
-        if (commands == null)
-        {
-            YouAreNotWorthyPlugin.Log.LogWarning(
-                $"Could not inspect Valheim's console-command registry; '{CommandName}' was not registered.");
-            return;
-        }
-
-        if (commands.ContainsKey(CommandName))
-        {
-            YouAreNotWorthyPlugin.Log.LogWarning(
-                $"Could not register '{CommandName}' because another console command already uses that name.");
             return;
         }
 
@@ -81,29 +61,8 @@ internal static class ItemReferenceCommands
     internal static void Shutdown()
     {
         _shutdown = true;
-        Dictionary<string, Terminal.ConsoleCommand>? commands = GetTerminalCommands();
-        if (_consoleCommand != null
-            && commands != null
-            && commands.TryGetValue(CommandName, out Terminal.ConsoleCommand registered)
-            && ReferenceEquals(registered, _consoleCommand))
-        {
-            commands.Remove(CommandName);
-        }
-
+        ConsoleCommandRegistry.Unregister(CommandName, _consoleCommand);
         _consoleCommand = null;
-    }
-
-    private static Dictionary<string, Terminal.ConsoleCommand>? GetTerminalCommands()
-    {
-        try
-        {
-            return TerminalCommandsField?.GetValue(null)
-                as Dictionary<string, Terminal.ConsoleCommand>;
-        }
-        catch (Exception)
-        {
-            return null;
-        }
     }
 
     private static void HandleConsoleCommand(Terminal.ConsoleEventArgs args)

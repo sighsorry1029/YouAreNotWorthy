@@ -118,6 +118,7 @@
         <Compile Include="Config\ProgressionConfigLoader.cs"/>
         <Compile Include="Config\LocationIconConfigLoader.cs"/>
         <Compile Include="Core\DirectPeerChecks.cs"/>
+        <Compile Include="Core\ConsoleCommandRegistry.cs"/>
         <Compile Include="Core\ItemReferenceWriter.cs"/>
         <Compile Include="Core\ItemReferenceCommands.cs"/>
         <Compile Include="Core\KeyReferenceWriter.cs"/>

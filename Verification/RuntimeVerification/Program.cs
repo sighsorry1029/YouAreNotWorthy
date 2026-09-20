@@ -171,6 +171,7 @@ internal static class Program
         Check("result Character.OnDeath: matched List<string>.Add = 0", CountDeathQueuePatterns(character.After, queue, defeatKey, listAdd) == 0);
 
         VerifyTierResolution(plugin);
+        ConsoleCommandVerification.Run(plugin, Check);
         System.Console.WriteLine("[PASS] all managed tier, reflection, pattern-count, transpiler-output, and dynamic IL/JIT checks passed");
         return 0;
     }

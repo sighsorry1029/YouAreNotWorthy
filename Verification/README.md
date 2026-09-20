@@ -97,3 +97,18 @@ save and public API compatibility; repeated requests and inventory quantity
 conservation, including disconnects and owner changes. The tier cases do not
 test runtime graph discovery, native prefab equality, cache invalidation,
 concurrent changes, or every cyclic graph.
+
+## Console command lifecycle checks
+
+`ConsoleCommandVerification` invokes the built plugin's two command owners with
+the original game's protected `Terminal.commands` field in an isolated process.
+It checks registration identity, flags and tab options, repeated registration,
+owned-entry removal, preservation of a foreign replacement, re-registration,
+repeated shutdown, and independent cleanup of the two owners. The registry is
+restored in `finally`. No console action or network request is executed.
+
+Pre-existing name conflicts and an unavailable registry reach the plugin's
+warning logger, which also initializes ServerSync. The baseline DLL cannot run
+that initialization without BepInEx's Unity `ThreadingHelper.Instance`. These
+warning paths are reviewed in the diff but are not executed by this standalone
+test; check them in Valheim. The harness does not stub plugin initialization.
