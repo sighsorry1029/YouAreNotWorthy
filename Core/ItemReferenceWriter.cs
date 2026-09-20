@@ -8,14 +8,6 @@ using YamlDotNet.Serialization;
 
 namespace YouAreNotWorthy;
 
-internal enum ItemReferenceWriteResult
-{
-    Updated,
-    Unchanged,
-    NotReady,
-    ShuttingDown
-}
-
 internal enum ItemReferenceRefreshResult
 {
     Updated,
@@ -175,12 +167,12 @@ internal static class ItemReferenceWriter
 
         try
         {
-            ItemReferenceWriteResult result = TryWriteIfNeededWithResult();
+            ItemReferenceRefreshResult result = TryWriteIfNeededWithResult();
             lock (Sync)
             {
                 if (!_shutdown)
                 {
-                    _retryAfter = result == ItemReferenceWriteResult.NotReady
+                    _retryAfter = result == ItemReferenceRefreshResult.RuntimeNotReady
                         ? now + NotReadyRetrySeconds
                         : 0f;
                 }
@@ -216,25 +208,18 @@ internal static class ItemReferenceWriter
         {
             RestrictionEvaluator.InvalidateItemCache();
             MarkDirty(ownerSourcesChanged: true);
-            ItemReferenceWriteResult result = TryWriteIfNeededWithResult();
+            ItemReferenceRefreshResult result = TryWriteIfNeededWithResult();
             lock (Sync)
             {
                 if (!_shutdown)
                 {
-                    _retryAfter = result == ItemReferenceWriteResult.NotReady
+                    _retryAfter = result == ItemReferenceRefreshResult.RuntimeNotReady
                         ? Time.realtimeSinceStartup + NotReadyRetrySeconds
                         : 0f;
                 }
             }
 
-            return result switch
-            {
-                ItemReferenceWriteResult.Updated => ItemReferenceRefreshResult.Updated,
-                ItemReferenceWriteResult.Unchanged => ItemReferenceRefreshResult.Unchanged,
-                ItemReferenceWriteResult.NotReady => ItemReferenceRefreshResult.RuntimeNotReady,
-                ItemReferenceWriteResult.ShuttingDown => ItemReferenceRefreshResult.ShuttingDown,
-                _ => ItemReferenceRefreshResult.Failed
-            };
+            return result;
         }
         catch (Exception ex)
         {
@@ -246,19 +231,19 @@ internal static class ItemReferenceWriter
         }
     }
 
-    private static ItemReferenceWriteResult TryWriteIfNeededWithResult()
+    private static ItemReferenceRefreshResult TryWriteIfNeededWithResult()
     {
         long revision;
         lock (Sync)
         {
             if (_shutdown)
             {
-                return ItemReferenceWriteResult.ShuttingDown;
+                return ItemReferenceRefreshResult.ShuttingDown;
             }
 
             if (!_dirty && File.Exists(ReferencePath))
             {
-                return ItemReferenceWriteResult.Unchanged;
+                return ItemReferenceRefreshResult.Unchanged;
             }
 
             revision = _revision;
@@ -267,7 +252,7 @@ internal static class ItemReferenceWriter
         if (!RestrictionEvaluator.TryCreateGuardedItemReferenceSnapshot(
                 out List<GuardedItemReference> entries))
         {
-            return ItemReferenceWriteResult.NotReady;
+            return ItemReferenceRefreshResult.RuntimeNotReady;
         }
 
         string content = BuildContent(entries);
@@ -282,8 +267,8 @@ internal static class ItemReferenceWriter
         }
 
         return changed
-            ? ItemReferenceWriteResult.Updated
-            : ItemReferenceWriteResult.Unchanged;
+            ? ItemReferenceRefreshResult.Updated
+            : ItemReferenceRefreshResult.Unchanged;
     }
 
     private static void ScheduleFailureRetry()
