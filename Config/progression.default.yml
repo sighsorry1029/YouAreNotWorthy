@@ -1,4 +1,4 @@
-# Custom personal keys awarded within 32m of a configured creature's death.
+# Custom personal keys awarded within 64m of a configured creature's death.
 # Vanilla/modded defeat global keys are personalized automatically and normally do
 # not need a duplicate defeatKeys rule.
 defeatKeys:
@@ -70,6 +70,8 @@ Swamp:
     - CuredSquirrelHamstring
     - CryptKey
     - TrophyAbomination
+    - WrithanRoots
+    - TrophyWrithan
 Ocean:
   requiredKey: defeated_gdking
   resources:
@@ -144,6 +146,7 @@ Mistlands:
     - MushroomMagecap
     - MushroomJotunPuffs
     - RoyalJelly
+    - Hook
 AshLands:
   requiredKey: defeated_queen
   resources:
@@ -174,3 +177,48 @@ AshLands:
     - Fiddleheadfern
     - TrophySeekerQueen
     - TrophyCharredMelee
+    - TrophyBlob_Lava
+
+# Northern progression uses the existing production-path inheritance.
+# Gold/Oat/OatFlour, casts and foundry products do not need duplicate entries.
+DeepNorth:
+  requiredKey: defeated_fader
+  resources:
+    - GoldOre
+    - CrownJewel
+    - OozeMork
+    - ElakingHairBundle
+    - FaderDrop
+    - FaderEmber
+    - FrostCore
+    - OrbFrostFire
+    - BarkaBranch
+    - Ice
+    - Leatherstraps
+    - FrozenFuel
+    - MoleClaws
+    - MooseHide
+    - MooseMeat
+    - MooseSinew
+    - NornThread
+    - SealBlubber
+    - SealHide
+    - SpiceDeepNorth
+    - OrbThunderBlood
+    - Frostwood
+    - TrophyBarka
+    - TrophyElaking
+    - TrophyMole
+    - TrophyJotunWitch
+    - TrophyJotunWarrior
+    - TrophyMoose
+    - TrophyBlob_Morkhalla
+    - TrophySeal
+    - FirConeFrost
+    - Kale
+    - KaleSeeds
+    - OatSeeds
+    - Poteitr
+    - PoteitrSeeds
+    - Lingonberry
+    - GlowWorm

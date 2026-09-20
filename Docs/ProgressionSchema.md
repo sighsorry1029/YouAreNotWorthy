@@ -98,14 +98,14 @@ rank에는 포함하지 않지만, 읽기 쉬움을 위해 맨 위에 두는 것
 
 - 비플레이어 `Character`의 죽음만 대상으로 한다.
 - 공격자 또는 막타를 판정하지 않는다.
-- 죽은 prefab의 위치에서 32m 안에 있는 활성 플레이어 모두에게 key를 지급한다.
+- 죽은 prefab의 위치에서 XYZ 직선거리 64m 미만에 있는 활성 플레이어 모두에게 key를 지급한다.
 - 한 rule의 여러 prefab은 같은 key를 지급한다.
 - counter, biome, 설정 가능한 radius, notification 조건은 없다.
 - 비교 전에 공백과 끝의 `(Clone)`을 제거하며 대소문자는 무시한다.
 
 Vanilla/mod prefab이 이미 `m_defeatSetGlobalKey`로 같은 진행 key를 쓰면 별도
 `defeatKeys` rule은 일반적으로 필요 없다. YNW가 그 global-key write를 같은 사망 위치와
-32m 규칙으로 자동 개인화한다.
+64m 규칙으로 자동 개인화한다.
 
 ### 2.2 제한 없는 tier 축약형
 
@@ -141,6 +141,21 @@ BlackForest:
 `requiredKey`는 world key를 직접 읽지 않는다. 동일 이름으로 캐릭터에 저장된 native
 unique key를 검사한다. YNW가 개인화한 `defeated_eikthyr`, Vanilla native player key,
 또는 `defeatKeys`가 만든 사용자 key를 모두 사용할 수 있다.
+
+### 2.4 Valheim 1.0.7 기본 재료 티어
+
+기본 목록은 기존 132개 항목을 보존하고 42개를 추가한 174개다.
+Swamp에 `WrithanRoots`/`TrophyWrithan`, Mistlands에 `Hook`, AshLands에
+`TrophyBlob_Lava`를 추가하고, 마지막 `DeepNorth`의 38개 항목에는 `defeated_fader`를 요구한다.
+별도 최종 보스 완료 티어는 없다.
+
+`Gold`, `Oat`, `OatFlour`, 주조 전 아이템과 Foundry 완제품은 기존 생산 경로에서
+티어를 상속한다. 주형 29종은 중복 등록하지 않는다. 연료 생산 경로를 자동 추적하지 않는
+`FrozenFuel`과 채집 경로의 `FaderEmber`는 직접 분류한다.
+
+이미 존재하는 사용자 `progression.yml`에는 새 기본값을 자동 병합하지 않는다.
+업데이트 시 서버/호스트의 파일을 백업하고 필요한 항목만 추가한다. 설정 재적용은 장비도
+재검사하므로 개인 요구 키가 없는 캐릭터의 기존 장비가 해제될 수 있다.
 
 ## 3. `locations.yml` 구조
 
@@ -427,7 +442,7 @@ Vanilla global-key 조회 경로를 쓰는 mod가 이 동작을 공유한다.
 
 ### 7.3 쓰기
 
-Personal boolean key write는 world에 기록하지 않고 사건 위치 32m 안의 활성 플레이어에게
+Personal boolean key write는 world에 기록하지 않고 사건 위치 64m 안의 활성 플레이어에게
 같은 이름의 native unique key를 지급한다.
 
 - `Character.m_defeatSetGlobalKey`와 `defeatKeys`: 죽은 creature 위치
@@ -436,7 +451,7 @@ Personal boolean key write는 world에 기록하지 않고 사건 위치 32m 안
 - `Vegvisir.Interact`: Vegvisir 위치
 - 별도 위치가 없는 일반 mod/console write: 요청 플레이어 위치 fallback
 
-요청 플레이어도 반경 조건을 만족할 때만 지급되며, 32m 밖의 플레이어나 막타자를 강제로
+요청 플레이어도 반경 조건을 만족할 때만 지급되며, 64m 밖의 플레이어나 막타자를 강제로
 포함하지 않는다. Fallback 요청 플레이어를 찾지 못하면 world write는 차단하지만 위치를
 추측해 personal key를 지급하지 않는다. 공유/value key write는 Vanilla대로 world에
 저장한다.
@@ -566,7 +581,7 @@ version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기�
 
 ## 12. 내장 기본 tier
 
-기본 `defeatKeys`에는 `Serpent` 사망 위치 32m 안의 활성 플레이어에게
+기본 `defeatKeys`에는 `Serpent` 사망 위치 64m 안의 활성 플레이어에게
 `defeat_serpent`를 지급하는 rule이 하나 있다. 기본 tier 순서와 gate는 다음과 같다.
 
 | rank | tier | requiredKey |
@@ -629,7 +644,7 @@ version을 요구하며 `keys.reference.yml`과 `items.reference.yml`은 동기�
 11. admin 단독, debug 단독, admin+debug를 구분해 시험한다.
 12. 두 YAML을 하나씩 잘못 편집해 해당 파일의 이전 LKG만 유지되고 다른 설정은 정상 reload되는지
     확인한다.
-13. 사망·Hildir 반납·OfferingBowl·Vegvisir 사건의 31.9m/32.1m 경계를 확인한다.
+13. 사망·Hildir 반납·OfferingBowl·Vegvisir 사건의 XYZ 거리 63.9m/64m/64.1m 경계를 확인한다. 정확히 64m는 지급 대상에서 제외된다.
 14. 비관리자/관리자, 잘못된 SteamID64, 로그아웃한 대상, `add`/`list`/`remove`, 제거 뒤
     정상 사건에 의한 재지급을 확인한다.
 15. 같은 character ID를 복제한 서로 다른 Steam 계정이 접속해도 SteamID64가 일치하는

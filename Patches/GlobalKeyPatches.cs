@@ -65,7 +65,7 @@ internal static class ZoneSystem_GetGlobalKey_Patches
     }
 }
 
-[HarmonyPatch(typeof(ZoneSystem), nameof(ZoneSystem.RPC_SetGlobalKey))]
+[HarmonyPatch(typeof(ZoneSystem), "RPC_SetGlobalKey")]
 internal static class ZoneSystem_RPC_SetGlobalKey_Patch
 {
     private static bool Prefix(long sender, string name)
@@ -171,7 +171,7 @@ internal static class Interaction_GlobalKey_EventPosition_Patch
     }
 }
 
-[HarmonyPatch(typeof(ZoneSystem), nameof(ZoneSystem.RPC_GlobalKeys))]
+[HarmonyPatch(typeof(ZoneSystem), "RPC_GlobalKeys")]
 internal static class ZoneSystem_RPC_GlobalKeys_Patch
 {
     private static void Postfix()

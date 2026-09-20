@@ -20,7 +20,7 @@ internal static class PlayerKeys
     private const string RpcSetPlayerKeyDirect = "YNW_SetPlayerKeyDirect";
     private const string RpcDistributePersonalKeyAt = "YNW_DistributePersonalKeyAt";
     private const int MaxPersonalKeyLength = 256;
-    internal const float PersonalKeyGrantRadius = 32f;
+    internal const float PersonalKeyGrantRadius = 64f;
 
     private static ZRoutedRpc? _registeredRpc;
 

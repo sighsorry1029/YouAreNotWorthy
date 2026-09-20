@@ -21,7 +21,7 @@ internal static class SpawnPersonalization
         AccessTools.MethodDelegate<FindBaseSpawnPointDelegate>(
             AccessTools.DeclaredMethod(
                 typeof(SpawnSystem),
-                nameof(SpawnSystem.FindBaseSpawnPoint),
+                "FindBaseSpawnPoint",
                 new[]
                 {
                     typeof(SpawnSystem.SpawnData),
@@ -73,25 +73,24 @@ internal static class SpawnPersonalization
             out targetPlayer);
     }
 
-    internal static bool HasRequiredSpawnKey(ZoneSystem world, string key, Player targetPlayer)
+    internal static bool CanAttemptSpawnKey(ZoneSystem world, string key)
     {
-        if (!ProgressionIndex.TryRegisterPersonalKey(key, out string canonicalKey))
-        {
-            return world.GetGlobalKey(key);
-        }
-
-        return PersonalKeySnapshot.TryHas(targetPlayer, canonicalKey, out bool hasKey) && hasKey;
+        // 1.0 checks this before selecting a player. Personal keys are enforced
+        // by FindEligibleBaseSpawnPoint; shared world keys keep the vanilla gate.
+        return ProgressionIndex.TryRegisterPersonalKey(key, out _)
+               || world.GetGlobalKey(key);
     }
 }
 
-[HarmonyPatch(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList))]
+[HarmonyPatch(typeof(SpawnSystem), "UpdateSpawnList",
+    typeof(List<SpawnSystem.SpawnData>), typeof(DateTime), typeof(bool), typeof(string))]
 internal static class SpawnSystem_UpdateSpawnList_Patch
 {
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
         MethodInfo findBaseSpawnPoint = AccessTools.Method(
             typeof(SpawnSystem),
-            nameof(SpawnSystem.FindBaseSpawnPoint),
+            "FindBaseSpawnPoint",
             new[]
             {
                 typeof(SpawnSystem.SpawnData),
@@ -106,9 +105,9 @@ internal static class SpawnSystem_UpdateSpawnList_Patch
             typeof(ZoneSystem),
             nameof(ZoneSystem.GetGlobalKey),
             new[] { typeof(string) });
-        MethodInfo hasRequiredSpawnKey = AccessTools.Method(
+        MethodInfo canAttemptSpawnKey = AccessTools.Method(
             typeof(SpawnPersonalization),
-            nameof(SpawnPersonalization.HasRequiredSpawnKey));
+            nameof(SpawnPersonalization.CanAttemptSpawnKey));
         FieldInfo requiredGlobalKey = AccessTools.Field(
             typeof(SpawnSystem.SpawnData),
             nameof(SpawnSystem.SpawnData.m_requiredGlobalKey));
@@ -133,38 +132,17 @@ internal static class SpawnSystem_UpdateSpawnList_Patch
         }
 
         int findCallIndex = findCalls[0];
-        int targetAddressIndex = findCallIndex - 1;
-        if (targetAddressIndex < 0
-            || (codes[targetAddressIndex].opcode != OpCodes.Ldloca
-                && codes[targetAddressIndex].opcode != OpCodes.Ldloca_S))
-        {
-            throw new InvalidOperationException("YNW could not capture SpawnSystem.UpdateSpawnList's selected target local.");
-        }
-
         int keyCallIndex = keyCalls[0];
-        if (codes[keyCallIndex].blocks.Count != 0)
+        if (keyCallIndex >= findCallIndex)
         {
-            throw new InvalidOperationException("YNW found an unexpected required-key check in SpawnSystem.UpdateSpawnList.");
-        }
-
-        object targetLocal = codes[targetAddressIndex].operand;
-        if (targetLocal is LocalBuilder local && local.LocalType != typeof(Player))
-        {
-            throw new InvalidOperationException("YNW captured a non-Player target local in SpawnSystem.UpdateSpawnList.");
+            throw new InvalidOperationException("YNW expected the 1.0 required-key check before spawn-point selection.");
         }
 
         codes[findCallIndex].opcode = OpCodes.Call;
         codes[findCallIndex].operand = findEligibleBaseSpawnPoint;
 
-        CodeInstruction loadTarget = new(
-            codes[targetAddressIndex].opcode == OpCodes.Ldloca_S ? OpCodes.Ldloc_S : OpCodes.Ldloc,
-            targetLocal);
-        loadTarget.labels.AddRange(codes[keyCallIndex].labels);
-        codes[keyCallIndex].labels.Clear();
-        codes.Insert(keyCallIndex, loadTarget);
-        keyCallIndex++;
         codes[keyCallIndex].opcode = OpCodes.Call;
-        codes[keyCallIndex].operand = hasRequiredSpawnKey;
+        codes[keyCallIndex].operand = canAttemptSpawnKey;
         return codes;
     }
 

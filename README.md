@@ -45,7 +45,7 @@ state keep their Vanilla behavior.
 ## Features
 
 - Personalizes compatible Vanilla and modded global-key progression.
-- Grants supported event keys to active players within 32 metres of a death,
+- Grants supported event keys to active players within 64 metres of a death,
   interaction, or requesting player.
 - Adds simple creature-defeat keys through `defeatKeys`.
 - Hides configured dedicated location icons until the character earns their key.
@@ -147,7 +147,7 @@ mode. This bypass does not disable global-key, raid, or spawn personalization.
 
 Personalizable global-key writes are kept out of shared world progression.
 Supported death and interaction paths grant the same literal as a native
-character key to active players within 32 metres of the relevant source.
+character key to active players within 64 metres of the relevant source.
 
 Trader and `ConditionalObject` checks use the local character. Raid and spawn
 patches evaluate their supported key conditions against the relevant character

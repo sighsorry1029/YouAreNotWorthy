@@ -10,24 +10,25 @@ plugin project and release package.
 
 Requirements: a .NET SDK that supports targeting .NET 8, the .NET 8 runtime,
 the plugin DLL and its dependencies, and a Valheim
-installation with `valheim_Data/Managed/publicized_assemblies/assembly_valheim_publicized.dll`.
+installation with the original `valheim_Data/Managed/assembly_valheim.dll` (Valheim 1.0.7).
 The project reads `../../environment.props`. Command-line MSBuild properties
 override its values, so a clean checkout does not need a machine-specific source
-edit. `ValheimGamePath`, `CorlibPath`, and `PublicizedAssembliesPath` are supported
-build overrides. The verifier references the publicized game assembly and
+edit. `CorlibPath` overrides the Managed compile-reference directory.
+The verifier references the original game assembly and
 `UnityEngine.CoreModule.dll`; its standalone Harmony API is pinned to the
 `Lib.Harmony` NuGet package, version 2.4.1.
 
 From the repository root in PowerShell:
 
 ```powershell
-$gamePath = 'D:\SteamLibrary\steamapps\common\Valheim'
-dotnet build YouAreNotWorthy.csproj -c Debug -p:DeployToGame=true "-p:ValheimGamePath=$gamePath"
-dotnet build Verification/RuntimeVerification/RuntimeVerification.csproj -c Release "-p:ValheimGamePath=$gamePath"
-dotnet Verification/RuntimeVerification/bin/Release/net8.0/YNW.RuntimeVerification.dll --repo . --game "$gamePath" --configuration Debug
+$gamePath = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim'
+dotnet build YouAreNotWorthy.csproj -c Debug -p:DeployToGame=true
+dotnet build Verification/RuntimeVerification/RuntimeVerification.csproj -c Debug
+dotnet Verification/RuntimeVerification/bin/Debug/net8.0/YNW.RuntimeVerification.dll --repo . --game "$gamePath" --configuration Debug
+./Verification/Verify-GameReferences.ps1
 ```
 
-The verifier's `-c Release` controls its own compilation. `--configuration Debug`
+The verifier's `-c Debug` controls its own compilation. `--configuration Debug`
 selects the **plugin** at `<repo>/bin/Debug/YouAreNotWorthy.dll`; use
 `--configuration Release` for the release plugin. The default plugin
 configuration is Debug. Both `--repo` and `--game` are required. `--plugin <path>`
@@ -35,12 +36,13 @@ can select an explicitly supplied DLL instead of `<repo>/bin/<configuration>`.
 `--help` prints the accepted arguments. Missing paths, failed assertions, or
 unsupported IL fail with exit code 1; a completed run returns 0.
 
-Build and run against the same game installation: the executable output includes
-copies of its game compile references. Changing only `--game` does not replace
-those copies. Runtime dependency lookup also searches the game's Managed,
-publicized assembly and BepInEx/core directories, `<repo>/Libs`, and the selected
-plugin DLL's directory. A custom build reference outside the standard game layout
-must still be available in the verifier output or one of these runtime locations.
+Game/Unity compile references are not copied into the verifier output. It loads
+original game assemblies from `--game` and checks the actual loaded path. Use
+`--managed <directory>` to check the dedicated server's `valheim_server_Data/Managed`
+with the same plugin DLL and client BepInEx dependencies. Runtime lookup also
+searches BepInEx/core, `<repo>/Libs`, and the selected plugin DLL directory.
+`Verify-GameReferences.ps1 -ManagedPath <directory>` checks all final DLL game
+type/member references and rejects obsolete literal-field load/store instructions.
 
 For before/after comparison, keep this verifier fixed and run it once with
 `--repo <baseline checkout>` and once with `--repo <updated checkout>`. Build both
@@ -48,6 +50,15 @@ plugin DLLs first and use the same game installation for both runs.
 
 ## What it verifies
 
+- Personal/shared key classification, embedded default YAML validation/index compilation,
+  the same read-only checks for the selected game's local progression.yml when present, and the
+  1.0 spawn precheck followed by refusal when no eligible player exists.
+- Static Harmony targets (including merged ServerSync), dynamic YNW target
+  factories, named arguments and injected field existence. Two optional
+  InventorySlots hooks are explicitly skipped by the standalone verifier.
+- All eight vanilla methods transformed by YNW, including interaction key writes
+  and location-icon transport/UI queries. Branches are widened during test IL
+  emission; the production transpiler output itself is unchanged.
 - The exact reflected overloads and expected original call patterns used by the
   SpawnSystem.UpdateSpawnList, CreatureSpawner.UpdateSpawner, and
   Character.OnDeath transpilers.
@@ -76,7 +87,7 @@ not a Unity performance measurement.
 
 ## Limits and remaining game checks
 
-The transformed spawn/death methods are **JIT-compiled but never invoked**.
+The transformed game methods are **JIT-compiled but never invoked**.
 Direct calls to Unity `InternalCall` methods in the verification IL are replaced
 with signature-compatible stubs that return defaults. No gameplay behavior is
 inferred from those stubs. The small decoder handles the installed targets; it

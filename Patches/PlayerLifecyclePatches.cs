@@ -16,7 +16,7 @@ internal static class ZNet_RoutedRpcRegistration_Patch
     }
 }
 
-[HarmonyPatch(typeof(ZNet), nameof(ZNet.OnNewConnection))]
+[HarmonyPatch(typeof(ZNet), "OnNewConnection")]
 internal static class ZNet_DirectRpcRegistration_Patch
 {
     private static void Postfix(ZNet __instance, ZNetPeer peer)
@@ -31,7 +31,7 @@ internal static class ZNet_DirectRpcRegistration_Patch
 internal static class PlayerLifecyclePatches
 {
     [HarmonyPrefix]
-    [HarmonyPatch(typeof(Player), nameof(Player.EquipInventoryItems))]
+    [HarmonyPatch(typeof(Player), "EquipInventoryItems")]
     private static void Player_EquipInventoryItems_Prefix(Player __instance)
     {
         try
@@ -52,7 +52,7 @@ internal static class PlayerLifecyclePatches
     [HarmonyPostfix]
     [HarmonyPriority(Priority.Last)]
     [HarmonyAfter(ItemRestriction.InventorySlotsGuid)]
-    [HarmonyPatch(typeof(Player), nameof(Player.EquipInventoryItems))]
+    [HarmonyPatch(typeof(Player), "EquipInventoryItems")]
     private static void Player_EquipInventoryItems_Postfix(Player __instance)
     {
         PublishPersonalKeys(__instance);
@@ -92,7 +92,7 @@ internal static class PlayerPersonalKeySnapshotPatches
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        yield return AccessTools.Method(typeof(Player), nameof(Player.Start));
+        yield return AccessTools.Method(typeof(Player), "Start");
         yield return AccessTools.Method(typeof(Player), nameof(Player.SetLocalPlayer));
         yield return AccessTools.Method(typeof(Player), nameof(Player.AddUniqueKey));
         yield return AccessTools.Method(typeof(Player), nameof(Player.RemoveUniqueKey));

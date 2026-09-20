@@ -228,7 +228,7 @@ internal static class RaidPersonalization
 
 }
 
-[HarmonyPatch(typeof(RandEventSystem), nameof(RandEventSystem.Awake))]
+[HarmonyPatch(typeof(RandEventSystem), "Awake")]
 internal static class RandEventSystem_Awake_Patch
 {
     private static void Postfix(RandEventSystem __instance)
@@ -244,7 +244,7 @@ internal static class RandEventSystem_Awake_Patch
     }
 }
 
-[HarmonyPatch(typeof(RandEventSystem), nameof(RandEventSystem.Start))]
+[HarmonyPatch(typeof(RandEventSystem), "Start")]
 [HarmonyAfter("sighsorry.DropNSpawn")]
 internal static class RandEventSystem_Start_Patch
 {
@@ -285,7 +285,7 @@ internal static class RandEventSystem_PlayerIsReadyForEvent_Patch
     }
 }
 
-[HarmonyPatch(typeof(RandEventSystem), nameof(RandEventSystem.HaveGlobalKeys))]
+[HarmonyPatch(typeof(RandEventSystem), "HaveGlobalKeys")]
 internal static class RandEventSystem_HaveGlobalKeys_Patch
 {
     private static bool Prefix(RandomEvent ev, List<RandEventSystem.PlayerEventData> players, ref bool __result)
@@ -316,7 +316,7 @@ internal static class RandEventSystem_HaveGlobalKeys_Patch
     }
 }
 
-[HarmonyPatch(typeof(RandEventSystem), nameof(RandEventSystem.GetValidEventPoints))]
+[HarmonyPatch(typeof(RandEventSystem), "GetValidEventPoints")]
 internal static class RandEventSystem_GetValidEventPoints_Patch
 {
     private static void Postfix(

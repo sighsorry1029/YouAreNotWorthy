@@ -16,6 +16,26 @@ internal static class ItemRestriction
 
     private static float _nextBlockedMessageTime;
 
+    internal static bool CanPatchInventorySlots()
+    {
+        if (!Chainloader.PluginInfos.ContainsKey(InventorySlotsGuid))
+        {
+            return false;
+        }
+
+        // The soft dependency runs first. A registered PluginInfo alone does not
+        // mean its Awake reached PatchAll (1.4.6 can fail earlier in YAML sync).
+        if (Harmony.HasAnyPatches(InventorySlotsGuid))
+        {
+            return true;
+        }
+
+        YouAreNotWorthyPlugin.Log.LogWarning(
+            "InventorySlots has no active Harmony patches; skipping its optional slot restriction hooks. "
+            + "Check InventorySlots initialization errors. Vanilla item restrictions remain active.");
+        return false;
+    }
+
     internal static bool TryBlock(
         Player player,
         ItemDrop.ItemData item,
@@ -328,18 +348,18 @@ internal static class OfferingBowlItemStandRestrictionPatch
                     continue;
                 }
 
-                string prefabName = itemStand.GetAttachedItem();
-                if (string.IsNullOrWhiteSpace(prefabName))
+                int prefabHash = itemStand.GetAttachedItem();
+                if (prefabHash == 0)
                 {
                     continue;
                 }
 
-                GameObject? prefab = objectDb.GetItemPrefab(prefabName);
+                GameObject? prefab = objectDb.GetItemPrefab(prefabHash);
                 ItemDrop? itemDrop = prefab?.GetComponent<ItemDrop>();
                 if ((Object?)itemDrop == null || itemDrop.m_itemData?.m_shared == null)
                 {
                     YouAreNotWorthyPlugin.Log.LogWarning(
-                        $"Could not resolve item-stand offering prefab '{prefabName}'; allowing that offering item.");
+                        $"Could not resolve item-stand offering prefab hash '{prefabHash}'; allowing that offering item.");
                     continue;
                 }
 
@@ -380,13 +400,14 @@ internal static class OfferingBowlItemStandRestrictionPatch
     typeof(int),
     typeof(bool),
     typeof(float),
-    typeof(int))]
+    typeof(int),
+    typeof(bool))]
 internal static class ItemTooltipRestrictionPatch
 {
     [ThreadStatic]
     private static int _tooltipDepth;
 
-    // ItemData.GetTooltip(int) wraps the static five-argument overload. Defer
+    // ItemData.GetTooltip(int) wraps the static six-argument overload. Defer
     // the restriction suffix while that outer call is active so outer tooltip
     // extensions (notably FineDining's spoilage line) cannot split our final
     // warning from the end of the tooltip.
@@ -553,7 +574,7 @@ internal static class InventorySlotsCanUseSpecialSlotRestrictionPatch
     [HarmonyPrepare]
     private static bool Prepare()
     {
-        return Chainloader.PluginInfos.ContainsKey(ItemRestriction.InventorySlotsGuid);
+        return ItemRestriction.CanPatchInventorySlots();
     }
 
     private static IEnumerable<MethodBase> TargetMethods()
@@ -622,7 +643,7 @@ internal static class InventorySlotsTryEquipIntoSlotRestrictionPatch
     [HarmonyPrepare]
     private static bool Prepare()
     {
-        return Chainloader.PluginInfos.ContainsKey(ItemRestriction.InventorySlotsGuid);
+        return ItemRestriction.CanPatchInventorySlots();
     }
 
     private static IEnumerable<MethodBase> TargetMethods()

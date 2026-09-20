@@ -7,16 +7,15 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>YNW.RuntimeVerification</AssemblyName>
     <CorlibPath Condition="'$(CorlibPath)' == ''">$(ValheimGamePath)/valheim_Data/Managed</CorlibPath>
-    <PublicizedAssembliesPath Condition="'$(PublicizedAssembliesPath)' == ''">$(CorlibPath)/publicized_assemblies</PublicizedAssembliesPath>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="assembly_valheim">
-      <HintPath>$(PublicizedAssembliesPath)/assembly_valheim_publicized.dll</HintPath>
-      <Private>true</Private>
+      <HintPath>$(CorlibPath)/assembly_valheim.dll</HintPath>
+      <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(CorlibPath)/UnityEngine.CoreModule.dll</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -24,8 +23,8 @@
     <PackageReference Include="Lib.Harmony" Version="2.4.1" />
   </ItemGroup>
   <Target Name="ValidateGameReferences" BeforeTargets="ResolveReferences">
-    <Error Condition="!Exists('$(PublicizedAssembliesPath)/assembly_valheim_publicized.dll')"
-           Text="Publicized Valheim assembly not found. Set ValheimGamePath or PublicizedAssembliesPath with an MSBuild -p: override." />
+    <Error Condition="!Exists('$(CorlibPath)/assembly_valheim.dll')"
+           Text="Original Valheim assembly not found. Set ValheimGamePath or CorlibPath with an MSBuild -p: override." />
     <Error Condition="!Exists('$(CorlibPath)/UnityEngine.CoreModule.dll')"
            Text="UnityEngine.CoreModule.dll not found. Set ValheimGamePath or CorlibPath with an MSBuild -p: override." />
   </Target>

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.7
+
+- Increased the personal-key grant radius from 32 to 64 metres so nearby players can receive progression credit from large or airborne enemies more reliably.
+- Simplified item-reference write states and centralized console-command registry ownership checks without changing commands, permissions, or network behavior.
+- Added regression checks for console-command registration, replacement safety, repeated shutdown, and client/server game-assembly compatibility.
+- Rewrote the package description with concise Valheim multiplayer, personal progression, raid, spawn, item-tier, and server-sync search terms.
+
+## 1.0.6
+
+- Added compatibility with Valheim 1.0.7, including updated spawn, tooltip, item-stand, location-icon, and private Harmony targets.
+- Fixed Vanilla boss progression keys being misclassified after the `GlobalKeys` layout changed.
+- Updated the embedded ServerSync implementation for the new `ZRoutedRpc.Everybody` constant contract.
+- Kept YouAreNotWorthy active when an installed InventorySlots version fails before registering its own patches; only the unavailable optional hooks are skipped.
+- Added 42 Valheim 1.0.7 resources to the default progression map, including Deep North materials under `defeated_fader`, while preserving production-path inheritance and existing tier assignments.
+- Expanded compatibility checks to validate original client and dedicated-server assemblies, Harmony targets, transpilers, and both embedded and installed progression configuration.
+
 ## 1.0.5
 
 - Reduced allocations during repeated item-tier checks and personal-key grants while preserving progression rules.

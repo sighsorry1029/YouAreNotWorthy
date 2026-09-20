@@ -15,6 +15,8 @@ internal static class Program
 {
     private const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
     private static string PluginPath;
+    private static string OriginalManagedPath;
+    private static string LocalProgressionPath;
     private static string[] SearchDirectories = Array.Empty<string>();
 
     private static int Main(string[] args)
@@ -29,6 +31,8 @@ internal static class Program
 
             ConfigurePaths(args);
             AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
+            foreach (string name in new[] { "assembly_utils", "assembly_guiutils", "assembly_valheim" })
+                Assembly.LoadFrom(Path.Combine(OriginalManagedPath, name + ".dll"));
             return Verify();
         }
         catch (Exception exception)
@@ -44,7 +48,7 @@ internal static class Program
 
     private static void PrintUsage()
     {
-        System.Console.WriteLine("Usage: YNW.RuntimeVerification --repo <checkout> --game <Valheim directory> [--configuration Debug|Release] [--plugin <DLL>]");
+        System.Console.WriteLine("Usage: YNW.RuntimeVerification --repo <checkout> --game <Valheim directory> [--managed <original Managed directory>] [--configuration Debug|Release] [--plugin <DLL>]");
         System.Console.WriteLine("Build this verifier against the same game directory. This is managed verification, not a Valheim play test.");
     }
 
@@ -54,7 +58,7 @@ internal static class Program
         for (int index = 0; index < args.Length; index += 2)
         {
             string option = args[index];
-            if ((option != "--repo" && option != "--game" && option != "--configuration" && option != "--plugin")
+            if ((option != "--repo" && option != "--game" && option != "--managed" && option != "--configuration" && option != "--plugin")
                 || index + 1 >= args.Length || options.ContainsKey(option))
             {
                 throw new ArgumentException("Unknown, duplicate, or incomplete option: " + option + ". Use --help for usage.");
@@ -71,6 +75,7 @@ internal static class Program
 
         string repo = Path.GetFullPath(repoArgument);
         string game = Path.GetFullPath(gameArgument);
+        LocalProgressionPath = Path.Combine(game, "BepInEx", "config", "YouAreNotWorthy", "progression.yml");
         string configuration = options.TryGetValue("--configuration", out string configured) ? configured : "Debug";
         if (configuration != "Debug" && configuration != "Release")
         {
@@ -80,7 +85,9 @@ internal static class Program
         PluginPath = Path.GetFullPath(options.TryGetValue("--plugin", out string plugin)
             ? plugin
             : Path.Combine(repo, "bin", configuration, "YouAreNotWorthy.dll"));
-        string managed = Path.Combine(game, "valheim_Data", "Managed");
+        string managed = Path.GetFullPath(options.TryGetValue("--managed", out string managedArgument)
+            ? managedArgument : Path.Combine(game, "valheim_Data", "Managed"));
+        OriginalManagedPath = managed;
         if (!Directory.Exists(repo) || !File.Exists(Path.Combine(managed, "assembly_valheim.dll")))
         {
             throw new DirectoryNotFoundException("--repo must exist and --game must contain valheim_Data/Managed/assembly_valheim.dll.");
@@ -106,9 +113,14 @@ internal static class Program
     private static int Verify()
     {
         Assembly plugin = Assembly.LoadFrom(PluginPath);
+        Check("loaded requested original game assembly", string.Equals(typeof(Player).Assembly.Location,
+            Path.Combine(OriginalManagedPath, "assembly_valheim.dll"), StringComparison.OrdinalIgnoreCase));
+        System.Console.WriteLine("[INFO] original game assembly: " + typeof(Player).Assembly.Location);
+        VerifyConfiguration(plugin);
+        VerifyPatchTargets(plugin);
 
         MethodInfo spawnUpdate = ExactMethod(typeof(SpawnSystem), "UpdateSpawnList",
-            typeof(List<SpawnSystem.SpawnData>), typeof(DateTime), typeof(bool));
+            typeof(List<SpawnSystem.SpawnData>), typeof(DateTime), typeof(bool), typeof(string));
         MethodInfo findBase = ExactMethod(typeof(SpawnSystem), "FindBaseSpawnPoint",
             typeof(SpawnSystem.SpawnData), typeof(List<Player>), typeof(Vector3).MakeByRefType(), typeof(Player).MakeByRefType());
         MethodInfo getGlobal = ExactMethod(typeof(ZoneSystem), "GetGlobalKey", typeof(string));
@@ -131,7 +143,7 @@ internal static class Program
         MethodInfo findEligible = ExactMethod(spawnHelper, "FindEligibleBaseSpawnPoint",
             typeof(SpawnSystem), typeof(SpawnSystem.SpawnData), typeof(List<Player>),
             typeof(Vector3).MakeByRefType(), typeof(Player).MakeByRefType());
-        MethodInfo hasRequired = ExactMethod(spawnHelper, "HasRequiredSpawnKey", typeof(ZoneSystem), typeof(string), typeof(Player));
+        MethodInfo hasRequired = ExactMethod(spawnHelper, "CanAttemptSpawnKey", typeof(ZoneSystem), typeof(string));
         MethodInfo personalRange2 = ExactMethod(creatureHelper, "IsPlayerInRange", typeof(Vector3), typeof(float), typeof(CreatureSpawner));
         MethodInfo personalRange3 = ExactMethod(creatureHelper, "IsPlayerInRange", typeof(Vector3), typeof(float), typeof(float), typeof(CreatureSpawner));
         MethodInfo maybeQueue = ExactMethod(deathPatch, "MaybeQueueVanillaDefeatKey", typeof(List<string>), typeof(string));
@@ -151,7 +163,7 @@ internal static class Program
         Check("pattern Spawn before: FindBaseSpawnPoint = 1", CountCall(spawn.Before, findBase) == 1);
         Check("pattern Spawn before: GetGlobalKey(string) = 1", CountCall(spawn.Before, getGlobal) == 1);
         Check("result Spawn: FindEligibleBaseSpawnPoint = 1", CountCall(spawn.After, findEligible) == 1);
-        Check("result Spawn: HasRequiredSpawnKey = 1", CountCall(spawn.After, hasRequired) == 1);
+        Check("result Spawn: CanAttemptSpawnKey = 1", CountCall(spawn.After, hasRequired) == 1);
         Check("result Spawn: original FindBaseSpawnPoint = 0", CountCall(spawn.After, findBase) == 0);
         Check("result Spawn: original GetGlobalKey(string) = 0", CountCall(spawn.After, getGlobal) == 0);
 
@@ -174,6 +186,97 @@ internal static class Program
         ConsoleCommandVerification.Run(plugin, Check);
         System.Console.WriteLine("[PASS] all managed tier, reflection, pattern-count, transpiler-output, and dynamic IL/JIT checks passed");
         return 0;
+    }
+
+    private static void VerifyConfiguration(Assembly plugin)
+    {
+        Type index = plugin.GetType("YouAreNotWorthy.ProgressionIndex", true);
+        MethodInfo shared = ExactMethod(index, "IsSharedWorldKey", typeof(string));
+        foreach (string key in new[] { "defeated_eikthyr", "defeated_dragon", "defeated_goblinking", "defeated_gdking", "defeated_bonemass", "KilledTroll", "KilledBat", "killed_surtling", "custom_personal_key" })
+            Check("personal key classification: " + key, !(bool)shared.Invoke(null, new object[] { key }));
+        foreach (string key in new[] { "NonServerOption", "PlayerEvents", "activeBosses", "AshlandsOcean", "Count", "season_winter", "ResourceRate 2", "NoMap" })
+            Check("shared key classification: " + key, (bool)shared.Invoke(null, new object[] { key }));
+
+        Type loader = plugin.GetType("YouAreNotWorthy.ProgressionConfigLoader", true);
+        string resource = plugin.GetManifestResourceNames().Single(name => name.EndsWith("progression.default.yml", StringComparison.Ordinal));
+        using StreamReader reader = new StreamReader(plugin.GetManifestResourceStream(resource));
+        ValidateProgression(reader.ReadToEnd(), "embedded default progression");
+        if (File.Exists(LocalProgressionPath))
+            ValidateProgression(File.ReadAllText(LocalProgressionPath), "installed local progression");
+
+        void ValidateProgression(string yaml, string source)
+        {
+            object[] arguments = { yaml, source, null };
+            Check(source + " validates", (bool)loader.GetMethod("TryParseAndValidate", All).Invoke(null, arguments));
+            // Exercise key classification and index compilation as well as YAML syntax.
+            // ValidateConfiguration builds a temporary index; it does not apply the YAML.
+            index.GetMethod("ValidateConfiguration", All).Invoke(null, new[] { arguments[2] });
+            Check(source + " compiles without applying configuration", true);
+        }
+        // No source-world read is allowed for a personal key before player selection.
+        MethodInfo precheck = ExactMethod(plugin.GetType("YouAreNotWorthy.SpawnPersonalization", true),
+            "CanAttemptSpawnKey", typeof(ZoneSystem), typeof(string));
+        Check("personal spawn precheck defers without a world/player", (bool)precheck.Invoke(null, new object[] { null, "defeated_eikthyr" }));
+        MethodInfo select = ExactMethod(precheck.DeclaringType, "FindEligibleBaseSpawnPoint",
+            typeof(SpawnSystem), typeof(SpawnSystem.SpawnData), typeof(List<Player>),
+            typeof(Vector3).MakeByRefType(), typeof(Player).MakeByRefType());
+        object[] selection = { null, new SpawnSystem.SpawnData { m_requiredGlobalKey = "defeated_eikthyr" },
+            new List<Player>(), null, null };
+        Check("personal spawn cannot proceed without an eligible player", !(bool)select.Invoke(null, selection)
+            && selection[4] == null);
+    }
+
+    private static void VerifyPatchTargets(Assembly plugin)
+    {
+        HashSet<MethodInfo> transformed = new HashSet<MethodInfo>();
+        int targets = 0;
+        foreach (Type patch in plugin.GetTypes().Where(type => type.Namespace == "YouAreNotWorthy" || type.Namespace == "ServerSync"))
+        {
+            if (!patch.IsDefined(typeof(HarmonyPatch), false)) continue;
+            if (patch.Name.StartsWith("InventorySlots", StringComparison.Ordinal))
+            {
+                System.Console.WriteLine("[SKIP] optional installed-mod integration: " + patch.Name);
+                continue;
+            }
+            List<HarmonyMethod> classAnnotations = HarmonyMethodExtensions.GetFromType(patch);
+            MethodInfo factory = patch.GetMethod("TargetMethods", All);
+            MethodInfo transpiler = patch.GetMethod("Transpiler", All);
+            if (factory != null)
+            {
+                MethodBase[] originals = ((IEnumerable<MethodBase>)factory.Invoke(null, null)).ToArray();
+                Check("dynamic target set: " + patch.Name, originals.Length > 0 && originals.All(method => method != null));
+                foreach (MethodBase original in originals) VerifyOriginal((MethodInfo)original, patch, transpiler);
+                continue;
+            }
+            foreach (MethodInfo method in patch.GetMethods(All | BindingFlags.DeclaredOnly))
+            {
+                bool isPatch = method.Name is "Prefix" or "Postfix" or "Finalizer" or "Transpiler"
+                    || method.GetCustomAttributes().Any(attribute => attribute is HarmonyPrefix or HarmonyPostfix or HarmonyFinalizer or HarmonyTranspiler);
+                if (!isPatch) continue;
+                HarmonyMethod annotation = HarmonyMethod.Merge(classAnnotations.Concat(HarmonyMethodExtensions.GetFromMethod(method)).ToList());
+                Check("declared patch target: " + patch.Name + "." + method.Name,
+                    annotation.declaringType != null && annotation.methodName != null);
+                MethodInfo original = AccessTools.Method(annotation.declaringType, annotation.methodName, annotation.argumentTypes);
+                Check("resolved patch target: " + annotation.declaringType.Name + "." + annotation.methodName, original != null);
+                VerifyOriginal(original, patch, method.Name == "Transpiler" ? method : null);
+                // Check named Harmony arguments and field injection against the original metadata.
+                foreach (ParameterInfo parameter in method.GetParameters())
+                {
+                    string name = parameter.Name;
+                    if (name.StartsWith("___", StringComparison.Ordinal))
+                        Check("injected field: " + name, AccessTools.Field(original.DeclaringType, name.Substring(3)) != null);
+                    else if (!name.StartsWith("__", StringComparison.Ordinal) && method.Name != "Transpiler")
+                        Check("injected argument: " + original.Name + "." + name, original.GetParameters().Any(p => p.Name == name));
+                }
+            }
+        }
+        System.Console.WriteLine("[INFO] resolved patch target bindings: " + targets + "; transpiled originals: " + transformed.Count);
+
+        void VerifyOriginal(MethodInfo original, Type patch, MethodInfo transpiler)
+        {
+            targets++;
+            if (transpiler != null && transformed.Add(original)) ApplyTranspiler(original, transpiler);
+        }
     }
 
     private static void VerifyTierResolution(Assembly plugin)
@@ -300,7 +403,8 @@ internal static class Program
     {
         DecodedMethod decoded = IlDecoder.Decode(target);
         List<CodeInstruction> before = decoded.Instructions;
-        object output = transpiler.Invoke(null, new object[] { before });
+        object output = transpiler.Invoke(null, transpiler.GetParameters().Length == 1
+            ? new object[] { before } : new object[] { before, target });
         List<CodeInstruction> after = ((IEnumerable<CodeInstruction>)output).ToList();
         EmitAndJit(decoded, after);
         Check("transformed IL re-emitted and JIT-compiled: " + target.DeclaringType.FullName + "." + target.Name, true);
@@ -426,7 +530,19 @@ internal static class Program
     private static void Emit(ILGenerator generator, OpCode opcode, object operand)
     {
         if (operand == null) { generator.Emit(opcode); return; }
-        if (operand is Label label) { generator.Emit(opcode, label); return; }
+        if (operand is Label label)
+        {
+            // Re-emission can expand local loads and calls beyond a short branch's range.
+            if (opcode.OperandType == OperandType.ShortInlineBrTarget)
+            {
+                string longName = opcode.Name.Substring(0, opcode.Name.Length - 2);
+                opcode = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
+                    .Where(field => field.FieldType == typeof(OpCode))
+                    .Select(field => (OpCode)field.GetValue(null)).Single(code => code.Name == longName);
+            }
+            generator.Emit(opcode, label);
+            return;
+        }
         if (operand is Label[] labels) { generator.Emit(opcode, labels); return; }
         if (operand is LocalBuilder local) { generator.Emit(opcode, local); return; }
         if (operand is string text) { generator.Emit(opcode, text); return; }

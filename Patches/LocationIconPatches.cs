@@ -179,7 +179,7 @@ internal static class LocationIconIdentityTransport
         Vector3 position,
         out string locationName)
     {
-        Vector2i zone = ZoneSystem.GetZone(position);
+        Vector2s zone = ZoneSystem.GetZone(position);
         if (zoneSystem.m_locationInstances.TryGetValue(
                 zone,
                 out ZoneSystem.LocationInstance instance))

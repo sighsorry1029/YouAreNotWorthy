@@ -260,7 +260,7 @@ internal static class CreatureSpawnPersonalization
     }
 }
 
-[HarmonyPatch(typeof(CreatureSpawner), nameof(CreatureSpawner.UpdateSpawner))]
+[HarmonyPatch(typeof(CreatureSpawner), "UpdateSpawner")]
 internal static class CreatureSpawner_UpdateSpawner_Patch
 {
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -321,7 +321,7 @@ internal static class CreatureSpawner_UpdateSpawner_Patch
     }
 }
 
-[HarmonyPatch(typeof(CreatureSpawner), nameof(CreatureSpawner.CheckGlobalKeys))]
+[HarmonyPatch(typeof(CreatureSpawner), "CheckGlobalKeys")]
 internal static class CreatureSpawner_CheckGlobalKeys_Patch
 {
     private static bool Prefix(CreatureSpawner __instance, ref bool __result)
@@ -346,7 +346,7 @@ internal static class CreatureSpawner_CheckGlobalKeys_Patch
     }
 }
 
-[HarmonyPatch(typeof(CreatureSpawner), nameof(CreatureSpawner.Spawn))]
+[HarmonyPatch(typeof(CreatureSpawner), "Spawn")]
 internal static class CreatureSpawner_Spawn_Patch
 {
     private static bool Prefix(CreatureSpawner __instance, ref ZNetView __result)
