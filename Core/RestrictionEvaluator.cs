@@ -254,6 +254,24 @@ internal static class RestrictionEvaluator
         return true;
     }
 
+    // Unlike TryResolveTier, false means unavailable, not a successfully resolved
+    // item without a tier. Remote authorization must not fail open on a cache failure.
+    internal static bool TryGetItemUseRequirement(string prefabName, out string requiredKey)
+    {
+        requiredKey = string.Empty;
+        ResolverState? state = EnsureResolver();
+        ItemDrop? itemDrop = state?.ObjectDb?.GetItemPrefab(prefabName)?.GetComponent<ItemDrop>();
+        ItemDrop.ItemData? item = itemDrop?.m_itemData;
+        if (state == null || item?.m_shared == null)
+        {
+            return false;
+        }
+
+        requiredKey = ResolveEffectiveTier(item, state, FindDirectTier(item, prefabName))?.RequiredKey
+                      ?? string.Empty;
+        return true;
+    }
+
     private static CompiledItemTier? ResolveEffectiveTier(
         ItemDrop.ItemData item,
         ResolverState? state,

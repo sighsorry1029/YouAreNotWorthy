@@ -15,7 +15,7 @@ namespace YouAreNotWorthy;
 public sealed class YouAreNotWorthyPlugin : BaseUnityPlugin
 {
     internal const string ModName = "YouAreNotWorthy";
-    internal const string ModVersion = "1.0.7";
+    internal const string ModVersion = "1.0.8";
     internal const string Author = "sighsorry";
     internal const string ModGUID = $"{Author}.{ModName}";
 

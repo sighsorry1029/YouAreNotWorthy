@@ -46,6 +46,70 @@ internal static class Program
         }
     }
 
+    private static bool ItemResolverAvailable;
+    private static string ItemRequiredKey = "";
+    private static bool ItemRequirementStub(ref bool __result, ref string requiredKey)
+    {
+        requiredKey = ItemRequiredKey;
+        __result = ItemResolverAvailable;
+        return false;
+    }
+
+    private static void VerifyItemUseApi(Assembly plugin)
+    {
+        Type api = plugin.GetType("YouAreNotWorthy.YouAreNotWorthyApi", true);
+        Type keyResult = plugin.GetType("YouAreNotWorthy.KeyQueryResult", true);
+        Type itemResult = plugin.GetType("YouAreNotWorthy.ItemUseQueryResult", true);
+        string[] oldNames = { "Invalid", "Unavailable", "PersonalMissing", "PersonalPresent", "SharedMissing", "SharedPresent" };
+        for (int i = 0; i < oldNames.Length; i++)
+            Check("existing key API numeric contract: " + oldNames[i], Convert.ToInt32(Enum.Parse(keyResult, oldNames[i])) == i);
+        string[] itemNames = { "Invalid", "Unavailable", "Allowed", "MissingRequirement" };
+        for (int i = 0; i < itemNames.Length; i++)
+            Check("item API numeric contract: " + itemNames[i], Convert.ToInt32(Enum.Parse(itemResult, itemNames[i])) == i);
+        MethodInfo local = ExactMethod(api, "QueryLocalItemUse", typeof(string), typeof(string).MakeByRefType());
+        MethodInfo peer = ExactMethod(api, "QueryPeerItemUse", typeof(ZNetPeer), typeof(string), typeof(string).MakeByRefType());
+        Check("local item API public static out contract", local.IsPublic && local.IsStatic && local.ReturnType == itemResult && local.GetParameters()[1].IsOut);
+        Check("peer item API public static out contract", peer.IsPublic && peer.IsStatic && peer.ReturnType == itemResult && peer.GetParameters()[2].IsOut);
+        var peerCalls = PatchProcessor.GetOriginalInstructions(peer)
+            .Where(instruction => instruction.operand is MethodInfo).Select(instruction => ((MethodInfo)instruction.operand).Name).ToList();
+        Check("peer authentication precedes item resolution", peerCalls.IndexOf("TryGetAuthenticatedPeerCharacter") >= 0
+            && peerCalls.IndexOf("TryGetAuthenticatedPeerCharacter") < peerCalls.IndexOf("QueryItemUse"));
+
+        Type evaluator = plugin.GetType("YouAreNotWorthy.RestrictionEvaluator", true);
+        MethodInfo resolver = ExactMethod(evaluator, "TryGetItemUseRequirement", typeof(string), typeof(string).MakeByRefType());
+        MethodInfo query = api.GetMethod("QueryItemUse", All);
+        Harmony isolation = new Harmony("ynw.verification.item-api");
+        isolation.Patch(resolver, prefix: new HarmonyMethod(typeof(Program), nameof(ItemRequirementStub)));
+        try
+        {
+            int Evaluate(string item, int keyValue, out string required)
+            {
+                Type delegateType = typeof(Func<,>).MakeGenericType(typeof(string), keyResult);
+                var parameter = Expression.Parameter(typeof(string));
+                Delegate keyQuery = Expression.Lambda(delegateType,
+                    Expression.Constant(Enum.ToObject(keyResult, keyValue), keyResult), parameter).Compile();
+                object[] args = { item, keyQuery, null };
+                int result = Convert.ToInt32(query.Invoke(null, args));
+                required = (string)args[2];
+                return result;
+            }
+            ItemResolverAvailable = true;
+            ItemRequiredKey = "defeated_queen";
+            Check("invalid item is not allowed", Evaluate("", 3, out _) == 0);
+            foreach (int key in Enumerable.Range(0, 6))
+            {
+                int expected = key < 2 ? 1 : key == 2 || key == 4 ? 3 : 2;
+                Check("item use requires known key result " + key,
+                    Evaluate("HatefulBlood", key, out string required) == expected && required == "defeated_queen");
+            }
+            ItemRequiredKey = "";
+            Check("resolved unclassified item allowed", Evaluate("item", 1, out _) == 2);
+            ItemResolverAvailable = false;
+            Check("resolver unavailable is not unclassified", Evaluate("item", 3, out _) == 1);
+        }
+        finally { isolation.UnpatchAll(isolation.Id); }
+    }
+
     private static void PrintUsage()
     {
         System.Console.WriteLine("Usage: YNW.RuntimeVerification --repo <checkout> --game <Valheim directory> [--managed <original Managed directory>] [--configuration Debug|Release] [--plugin <DLL>]");
@@ -117,6 +181,7 @@ internal static class Program
             Path.Combine(OriginalManagedPath, "assembly_valheim.dll"), StringComparison.OrdinalIgnoreCase));
         System.Console.WriteLine("[INFO] original game assembly: " + typeof(Player).Assembly.Location);
         VerifyConfiguration(plugin);
+        VerifyItemUseApi(plugin);
         VerifyPatchTargets(plugin);
 
         MethodInfo spawnUpdate = ExactMethod(typeof(SpawnSystem), "UpdateSpawnList",

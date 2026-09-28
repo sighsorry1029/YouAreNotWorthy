@@ -163,8 +163,8 @@ manual, and Vegvisir-created saved pins are unaffected.
 
 ## Mod integration API
 
-`YouAreNotWorthyApi.ApiVersion` identifies the public API contract. Version 1
-provides `QueryLocal(key)` for the current character, `QueryPeer(peer, key)` for
+`YouAreNotWorthyApi.ApiVersion` identifies the public API contract. Version 2
+preserves `QueryLocal(key)` for the current character, `QueryPeer(peer, key)` for
 an authenticated character on the authoritative server, and
 `TryShowLocalMissingRequirement(key)` for integrations that have already
 established a missing local requirement and want YNW to own the localized
@@ -189,6 +189,21 @@ seasonal, and value-bearing world keys retain Vanilla shared state and return a
 Remote personal-key snapshots are owned by the client character. Peer and
 character validation prevents accidental cross-player queries, but the API is
 not an anti-cheat substitute for a server-owned progression ledger.
+
+Version 2 adds `QueryLocalItemUse(prefabName, out requiredKey)` and server-only
+`QueryPeerItemUse(peer, prefabName, out requiredKey)`. `ItemUseQueryResult` has
+stable values `Invalid=0`, `Unavailable=1`, `Allowed=2`, `MissingRequirement=3`.
+These read-only, forced item-use checks resolve the actual item through ObjectDB
+and the existing tier/material cache without requiring inventory possession.
+Missing ObjectDB/cache/item data returns Unavailable; a successfully resolved
+item without a requirement returns Allowed. They never grant the local admin
+debug bypass. Existing native item restriction behavior is unchanged.
+
+BossRules 1.1.2+ uses these APIs from YouAreNotWorthy 1.0.8+ for optional free Queen/Frozen King inner-altar
+summons until personal completion while retaining item progression requirements.
+Frozen King requires personal `LastBossGate_Open` and checks final
+`defeated_frozenking_p3`; the external gate remains paid. Install both updated
+mods on clients and the host/server. No new key storage or YAML migration is used.
 
 ## Admin commands
 

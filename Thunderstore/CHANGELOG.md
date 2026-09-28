@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.8
+
+- Add read-only API v2 item-use checks for the local character and authenticated server peers, allowing integrations to waive item costs while preserving progression requirements. Unavailable item or character data does not authorize use; existing key-query contracts are preserved.
+- Support BossRules 1.1.2 personal first-victory Queen and inner Frozen King summons. The external Frozen King gate remains paid, and final completion uses `defeated_frozenking_p3`. Install both updated mods on the host/server and clients.
+- Reuse the existing item-tier cache and personal-key snapshots without changing saved keys or progression YAML. The new strict item-use API does not apply an administrator/debug bypass; existing native item restrictions are unchanged.
+- Add API contract and result regression checks, and update the BepInEx package requirement to 5.4.2351.
+
 ## 1.0.7
 
 - Increased the personal-key grant radius from 32 to 64 metres so nearby players can receive progression credit from large or airborne enemies more reliably.
