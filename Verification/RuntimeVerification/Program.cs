@@ -261,6 +261,7 @@ internal static class Program
             Check("personal key classification: " + key, !(bool)shared.Invoke(null, new object[] { key }));
         foreach (string key in new[] { "NonServerOption", "PlayerEvents", "activeBosses", "AshlandsOcean", "Count", "season_winter", "ResourceRate 2", "NoMap" })
             Check("shared key classification: " + key, (bool)shared.Invoke(null, new object[] { key }));
+        VerifyPathOfValheimanKeys(plugin, index, shared);
 
         Type loader = plugin.GetType("YouAreNotWorthy.ProgressionConfigLoader", true);
         string resource = plugin.GetManifestResourceNames().Single(name => name.EndsWith("progression.default.yml", StringComparison.Ordinal));
@@ -289,6 +290,60 @@ internal static class Program
             new List<Player>(), null, null };
         Check("personal spawn cannot proceed without an eligible player", !(bool)select.Invoke(null, selection)
             && selection[4] == null);
+    }
+
+    private static void VerifyPathOfValheimanKeys(Assembly plugin, Type index, MethodInfo shared)
+    {
+        // Examples from PoV 4.10.1's world writers/readers, including a layout
+        // larger than the diagnostic key observer's 256-character limit.
+        string[] worldKeys =
+        {
+            "pov_monolith_placed_2", "pov_monolith_placed_2_125_600",
+            "pov_monolith_layout_1_-120,300;0,-50",
+            "pov_monolith_layout_1_" + string.Join(";", Enumerable.Range(0, 125).Select(i => $"{i * 600},{-i * 600}")),
+            "pov_monolith_start_clearance_1", "pov_monolith_start_clearance_2",
+            "pov_monolith_start_clearance_3", "pov_monolith_reset_1",
+            "pov_mono_won_-120_300", "pov_mono_cooldown_-120_300",
+            "pov_mono_cooldown_-120_300 1234567.5",
+            "pov_rune_-120_300", "pov_rune_total", "pov_rune_total 12",
+            "pov_dng_-120_300", "pov_dng_total", "pov_dng_total 10",
+            "pov_poi_-120_300", "pov_poi_total", "pov_poi_total 8",
+            "  POV_MONO_WON_-120_300  "
+        };
+        MethodInfo register = ExactMethod(index, "TryRegisterPersonalKey", typeof(string), typeof(string).MakeByRefType());
+        MethodInfo resolve = ExactMethod(index, "TryResolvePersonalKey", typeof(string), typeof(string).MakeByRefType());
+        foreach (string key in worldKeys)
+        {
+            string label = key.Length > 80 ? "long monolith layout" : key;
+            Check("PoV world classification: " + label, (bool)shared.Invoke(null, new object[] { key }));
+            object[] registration = { key, null };
+            Check("PoV refuses personal registration: " + label,
+                !(bool)register.Invoke(null, registration) && (string)registration[1] == string.Empty);
+        }
+
+        foreach (string key in new[]
+        {
+            "pov_custom_progress", "pov_monolith_custom", "pov_monolith_placed_20",
+            "pov_monolith_layout_10_100,200", "pov_monolith_reset_10", "pov_monolith_start_clearance_30",
+            "pov_mono_wonder", "pov_runequest", "pov_dngquest", "pov_poiquest",
+            "pt.mono.100_200", "pt.guard.100_200", "defeated_eikthyr", "defeated_frozenking_p3"
+        })
+        {
+            Check("PoV exemption stays scoped: " + key, !(bool)shared.Invoke(null, new object[] { key })
+                && (bool)resolve.Invoke(null, new object[] { key, null }));
+        }
+
+        // A shared PoV world marker must not become a personal defeat grant via YAML.
+        object config = Activator.CreateInstance(plugin.GetType("YouAreNotWorthy.ProgressionConfig", true), nonPublic: true);
+        Type ruleType = plugin.GetType("YouAreNotWorthy.DefeatKeyRule", true);
+        object rule = Activator.CreateInstance(ruleType, nonPublic: true);
+        ruleType.GetProperty("Key", All).SetValue(rule, "pov_monolith_reset_1");
+        ((IList)config.GetType().GetProperty("DefeatKeys", All).GetValue(config)).Add(rule);
+        bool rejected = false;
+        try { index.GetMethod("ValidateConfiguration", All).Invoke(null, new[] { config }); }
+        catch (TargetInvocationException exception) when (exception.InnerException is InvalidOperationException)
+        { rejected = true; }
+        Check("PoV world marker rejected as a configured personal key", rejected);
     }
 
     private static void VerifyPatchTargets(Assembly plugin)

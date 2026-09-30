@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.9
+
+- Fix Path of Valheiman 4.10.1 world records being blocked or converted into personal keys: monolith layout, placement, reset, completion and cooldowns, plus runestone discovery, dungeon completion and legacy place records.
+- Preserve PoV's native character records and YNW's personal boss progression. Only the identified world-key families are shared; no PoV dependency is added. Update YNW on the host/server and clients.
+- Keep public API v2 and its existing signatures and result values. The reserved PoV keys now return shared-key results and cannot be configured as personal requirements.
+- Add regression checks for PoV key families, long layouts, cooldown/total queries and similarly named personal keys.
+- Existing saves are not migrated or repaired. Back up affected worlds before loading: if PoV's reset marker is missing, its own initialization can remove existing world monolith completion records.
+
 ## 1.0.8
 
 - Add read-only API v2 item-use checks for the local character and authenticated server peers, allowing integrations to waive item costs while preserving progression requirements. Unavailable item or character data does not authorize use; existing key-query contracts are preserved.

@@ -23,7 +23,13 @@ internal static class ProgressionIndex
         "season_winter",
         "season_fall",
         "season_summer",
-        "season_spring"
+        "season_spring",
+        // Path of Valheiman 4.10.1 server placement and one-time cleanup markers.
+        "pov_monolith_placed_2",
+        "pov_monolith_reset_1",
+        "pov_monolith_start_clearance_1",
+        "pov_monolith_start_clearance_2",
+        "pov_monolith_start_clearance_3"
     };
 
     private sealed class IndexState
@@ -160,6 +166,20 @@ internal static class ProgressionIndex
 
         string normalizedKey = ValheimNameUtils.NormalizeKey(booleanKey);
         if (SharedBooleanKeys.Contains(normalizedKey))
+        {
+            return true;
+        }
+
+        // PoV reads these world records through both GetGlobalKey overloads and
+        // GetGlobalKeys. Keep bare-name queries shared too (cooldown/total writes
+        // have values). Its separate native character records remain untouched.
+        if (normalizedKey.StartsWith("pov_monolith_placed_2_", StringComparison.Ordinal)
+            || normalizedKey.StartsWith("pov_monolith_layout_1_", StringComparison.Ordinal)
+            || normalizedKey.StartsWith("pov_mono_won_", StringComparison.Ordinal)
+            || normalizedKey.StartsWith("pov_mono_cooldown_", StringComparison.Ordinal)
+            || normalizedKey.StartsWith("pov_rune_", StringComparison.Ordinal)
+            || normalizedKey.StartsWith("pov_dng_", StringComparison.Ordinal)
+            || normalizedKey.StartsWith("pov_poi_", StringComparison.Ordinal))
         {
             return true;
         }

@@ -53,6 +53,12 @@ plugin DLLs first and use the same game installation for both runs.
 - Personal/shared key classification, embedded default YAML validation/index compilation,
   the same read-only checks for the selected game's local progression.yml when present, and the
   1.0 spawn precheck followed by refusal when no eligible player exists.
+- PoV 4.10.1 world-key classification and refusal of personal registration,
+  including long layouts, bare cooldown/total queries, casing, similarly named
+  unrelated personal keys, and rejection as a configured personal defeat key.
+  These checks do not invoke the Get/Set Harmony prefixes: their diagnostic
+  observer requires Unity's native clock. World storage, RPC synchronization,
+  PoV rewards and existing-save recovery still require game verification.
 - Static Harmony targets (including merged ServerSync), dynamic YNW target
   factories, named arguments and injected field existence. Two optional
   InventorySlots hooks are explicitly skipped by the standalone verifier.

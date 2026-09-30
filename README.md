@@ -161,6 +161,30 @@ World Data display tokens remain intact after YNW uses the transported prefab
 identity for filtering. The raw location data remains shared; unresolved,
 manual, and Vegvisir-created saved pins are unaffected.
 
+## Path of Valheiman compatibility
+
+YNW preserves Path of Valheiman 4.10.1's shared world records: monolith layout,
+placement, cleanup/reset markers, completion and cooldowns; runestone discoveries;
+and dungeon completion, including legacy place records and world totals. These
+keys use the game's world storage and synchronization instead of nearby personal
+key grants. PoV's character level, skill tree and native personal records remain
+unchanged; supported boss keys still follow YNW's personal progression.
+
+The exceptions cover `pov_monolith_placed_2`, its `pov_monolith_placed_2_` prefix,
+`pov_monolith_layout_1_`, `pov_monolith_reset_1`, the three
+`pov_monolith_start_clearance_1/2/3` keys, and the `pov_mono_won_`,
+`pov_mono_cooldown_`, `pov_rune_`, `pov_dng_` and `pov_poi_` prefixes.
+Other `pov_` keys are not automatically reserved. No PoV dependency is required.
+
+These shared keys cannot be configured as personal requirements in
+`progression.yml` or `locations.yml`. The public API remains version 2 and returns
+`SharedPresent`/`SharedMissing` for them when a query is available.
+
+Existing character records are not deleted or promoted to world records. This
+patch does not reconstruct world writes blocked by earlier YNW versions. Back up
+an affected world before loading it: if `pov_monolith_reset_1` is absent, PoV's
+own first-run cleanup can remove existing world monolith completion records.
+
 ## Mod integration API
 
 `YouAreNotWorthyApi.ApiVersion` identifies the public API contract. Version 2
